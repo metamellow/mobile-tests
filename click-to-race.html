@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dog Race Game</title>
+    <style>
+        :root {
+            --screaming-green: #76ff03;
+            --dark-bg: #121212;
+            --light-text: #e0e0e0;
+            --disabled-gray: #555;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            flex-direction: column;
+            background-color: var(--dark-bg);
+            color: var(--light-text);
+        }
+
+        .container {
+            text-align: center;
+            width: 90vw;
+        }
+
+        #raceTrack {
+            position: relative;
+            width: 100%;
+            height: 20vh;
+            border: 2px solid var(--screaming-green);
+            margin: 20px auto;
+        }
+
+        .dog {
+            position: absolute;
+            left: 0;
+            font-size: 2rem;
+        }
+
+        #playerDog {
+            top: 20%;
+        }
+
+        #computerDog1 {
+            top: 50%;
+        }
+
+        #computerDog2 {
+            top: 80%;
+        }
+
+        #actionButton {
+            width: 100%;
+            height: 50px;
+            background-color: var(--screaming-green);
+            color: var(--dark-bg);
+            font-size: 1.5rem;
+            border: none;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: background-color 0.3s;
+        }
+
+        #actionButton:disabled {
+            background-color: var(--disabled-gray);
+            cursor: not-allowed;
+        }
+
+        #tapCount, #result {
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="raceTrack">
+            <div class="dog" id="playerDog">🐶</div>
+            <div class="dog" id="computerDog1">🐶</div>
+            <div class="dog" id="computerDog2">🐶</div>
+        </div>
+        <div id="tapCount">Taps: 0</div>
+        <div id="result"></div>
+        <button id="actionButton">Start Race / Tap to Run</button>
+    </div>
+    <script>
+        class Dog {
+            constructor(element, speed = 0) {
+                this.element = element;
+                this.speed = speed;
+                this.position = 0;
+            }
+
+            move() {
+                this.position += this.speed;
+                this.element.style.left = `${this.position}%`;
+            }
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            const playerDog = new Dog(document.getElementById("playerDog"));
+            const computerDog1 = new Dog(document.getElementById("computerDog1"), Math.random() * 0.7 + 0.5);
+            const computerDog2 = new Dog(document.getElementById("computerDog2"), Math.random() * 0.7 + 0.5);
+
+            const actionButton = document.getElementById("actionButton");
+            const tapCountDisplay = document.getElementById("tapCount");
+            const resultDisplay = document.getElementById("result");
+            let tapCount = 0;
+            let gameInterval;
+            let raceInProgress = false;
+
+            function startRace() {
+                tapCount = 0;
+                playerDog.position = 0;
+                computerDog1.position = 0;
+                computerDog2.position = 0;
+                tapCountDisplay.innerText = `Taps: ${tapCount}`;
+                resultDisplay.innerText = "";
+                raceInProgress = true;
+
+                // Randomize speeds for each new race
+                computerDog1.speed = Math.random() * 0.7 + 0.5;
+                computerDog2.speed = Math.random() * 0.7 + 0.5;
+
+                gameInterval = setInterval(() => {
+                    if (raceInProgress) {
+                        computerDog1.move();
+                        computerDog2.move();
+                        checkWinner();
+                    }
+                }, 100);
+            }
+
+            function checkWinner() {
+                if (playerDog.position >= 100 || computerDog1.position >= 100 || computerDog2.position >= 100) {
+                    raceInProgress = false;
+                    clearInterval(gameInterval);
+                    if (playerDog.position >= 100) {
+                        resultDisplay.innerText = "Player Wins!";
+                    } else if (computerDog1.position >= 100) {
+                        resultDisplay.innerText = "Computer Dog 1 Wins!";
+                    } else {
+                        resultDisplay.innerText = "Computer Dog 2 Wins!";
+                    }
+                    disableButton();
+                }
+            }
+
+            function disableButton() {
+                actionButton.disabled = true;
+                setTimeout(() => {
+                    actionButton.disabled = false;
+                }, 5000);
+            }
+
+            actionButton.addEventListener("click", () => {
+                if (!raceInProgress) {
+                    startRace();
+                } else if (tapCount < 100) {
+                    tapCount++;
+                    playerDog.position += 2; // Increase movement per tap for better visibility
+                    playerDog.move();
+                    tapCountDisplay.innerText = `Taps: ${tapCount}`;
+                }
+            });
+        });
+    </script>
+</body>
+</html>
