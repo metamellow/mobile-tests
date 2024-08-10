@@ -288,7 +288,7 @@
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-Master-Key': API_KEY,
+                    'X-Access-Key': API_KEY,
                     'X-Bin-Versioning': 'false'
                 },
                 body: JSON.stringify({ record: highScores })
@@ -311,7 +311,7 @@
             fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
                 method: 'GET',
                 headers: {
-                    'X-Master-Key': API_KEY,
+                    'X-Access-Key': API_KEY,
                     'X-Bin-Meta': 'false'
                 }
             })
