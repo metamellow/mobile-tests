@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blockwarp Flappybird</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #000000;
+            font-family: Arial, sans-serif;
+            color: #FFFFFF;
+        }
+        #gameContainer {
+            position: relative;
+            width: 400px;
+            height: 600px;
+        }
+        #gameCanvas {
+            border: 2px solid #9932cc;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.8);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+        }
+        .hidden {
+            display: none;
+        }
+        h2 {
+            color: #FFB347;
+            margin-bottom: 20px;
+        }
+        #highScoresList, #endHighScoresList {
+            list-style-type: none;
+            padding: 0;
+            width: 80%;
+        }
+        #highScoresList li, #endHighScoresList li {
+            background-color: rgba(153, 50, 204, 0.3);
+            margin: 5px 0;
+            padding: 5px 10px;
+            border-radius: 5px;
+            display: flex;
+            justify-content: space-between;
+        }
+        #playerNameInput {
+            margin: 10px 0;
+            padding: 5px;
+            width: 200px;
+            background-color: #3a134e;
+            border: 1px solid #9932cc;
+            color: #FFFFFF;
+        }
+        #submitScore, #startButton, #restartButton {
+            margin-top: 10px;
+            padding: 5px 15px;
+            background-color: #FF4793;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        #startButton, #restartButton {
+            background-color: #47FFB3;
+            color: #000000;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="400" height="600"></canvas>
+        <div id="startOverlay" class="overlay">
+            <h2>Top 10 Scores</h2>
+            <ul id="highScoresList"></ul>
+            <button id="startButton">Start Game</button>
+        </div>
+        <div id="endOverlay" class="overlay hidden">
+            <h2>Game Over</h2>
+            <p>Your Score: <span id="finalScore"></span></p>
+            <div id="newHighScore" class="hidden">
+                <p>New High Score!</p>
+                <input type="text" id="playerNameInput" placeholder="Enter your name" maxlength="20">
+                <button id="submitScore">Submit Score</button>
+            </div>
+            <ul id="endHighScoresList"></ul>
+            <button id="restartButton">Play Again</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const startOverlay = document.getElementById('startOverlay');
+        const endOverlay = document.getElementById('endOverlay');
+        const highScoresList = document.getElementById('highScoresList');
+        const endHighScoresList = document.getElementById('endHighScoresList');
+        const finalScoreSpan = document.getElementById('finalScore');
+        const newHighScoreDiv = document.getElementById('newHighScore');
+        const playerNameInput = document.getElementById('playerNameInput');
+        const submitScoreButton = document.getElementById('submitScore');
+        const startButton = document.getElementById('startButton');
+        const restartButton = document.getElementById('restartButton');
+
+        const COLORS = {
+            background: '#000000',
+            bird: '#FF4793',
+            pipe: '#47FFB3',
+            ground: '#9932cc',
+            text: '#FFB347'
+        };
+
+        // Game variables
+        let GRAVITY = 0.05;
+        let FLAP_STRENGTH = -2.5;
+        let PIPE_SPEED = 0.8;
+        const PIPE_WIDTH = 80;
+        let PIPE_GAP = 250;
+        const GROUND_HEIGHT = 100;
+
+        let bird = {
+            x: 100,
+            y: 300,
+            velocity: 0,
+            width: 34,
+            height: 24
+        };
+
+        let pipes = [];
+        let score = 0;
+        let gameOver = false;
+        let gameStarted = false;
+        let highScores = [];
+        let difficultyTimer = 0;
+
+        // JSONbin.io configuration
+        const API_KEY = '$2a$10$6eJ0SxzKIlEXdodMXUhnHupivKS0IXEgf5Td80jwTlDuYjSsnNHRS';
+        const BIN_ID = '66b7827eacd3cb34a872b926';
+
+        function createPipe() {
+            let gapStart = Math.random() * (canvas.height - PIPE_GAP - GROUND_HEIGHT - 120) + 60;
+            pipes.push({
+                x: canvas.width,
+                top: gapStart,
+                bottom: gapStart + PIPE_GAP
+            });
+        }
+
+        function drawBird() {
+            ctx.fillStyle = COLORS.bird;
+            ctx.fillRect(bird.x, bird.y, bird.width, bird.height);
+        }
+
+        function drawPipes() {
+            ctx.fillStyle = COLORS.pipe;
+            pipes.forEach(pipe => {
+                ctx.fillRect(pipe.x, 0, PIPE_WIDTH, pipe.top);
+                ctx.fillRect(pipe.x, pipe.bottom, PIPE_WIDTH, canvas.height - pipe.bottom - GROUND_HEIGHT);
+            });
+        }
+
+        function drawGround() {
+            ctx.fillStyle = COLORS.ground;
+            ctx.fillRect(0, canvas.height - GROUND_HEIGHT, canvas.width, GROUND_HEIGHT);
+        }
+
+        function drawScore() {
+            ctx.fillStyle = COLORS.text;
+            ctx.font = 'bold 48px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(score, canvas.width / 2, 100);
+        }
+
+        function increaseDifficulty() {
+            difficultyTimer++;
+            if (difficultyTimer % 500 === 0) { // Increase difficulty more slowly
+                GRAVITY = Math.min(GRAVITY + 0.005, 0.15);
+                PIPE_SPEED = Math.min(PIPE_SPEED + 0.05, 1.5);
+                PIPE_GAP = Math.max(PIPE_GAP - 1, 180);
+            }
+        }
+
+        function update() {
+            if (!gameStarted || gameOver) return;
+
+            increaseDifficulty();
+
+            bird.velocity += GRAVITY;
+            bird.y += bird.velocity;
+
+            if (bird.y + bird.height > canvas.height - GROUND_HEIGHT) {
+                bird.y = canvas.height - GROUND_HEIGHT - bird.height;
+                endGame();
+            }
+
+            if (bird.y < 0) {
+                bird.y = 0;
+                bird.velocity = 0;
+            }
+
+            pipes.forEach(pipe => {
+                pipe.x -= PIPE_SPEED;
+
+                if (
+                    bird.x < pipe.x + PIPE_WIDTH &&
+                    bird.x + bird.width > pipe.x &&
+                    (bird.y < pipe.top || bird.y + bird.height > pipe.bottom)
+                ) {
+                    endGame();
+                }
+
+                if (pipe.x + PIPE_WIDTH < bird.x && !pipe.passed) {
+                    score++;
+                    pipe.passed = true;
+                }
+            });
+
+            pipes = pipes.filter(pipe => pipe.x > -PIPE_WIDTH);
+
+            if (pipes.length === 0 || pipes[pipes.length - 1].x < canvas.width - 250) {
+                createPipe();
+            }
+        }
+
+        function draw() {
+            ctx.fillStyle = COLORS.background;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            drawPipes();
+            drawBird();
+            drawGround();
+            drawScore();
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function endGame() {
+            gameOver = true;
+            finalScoreSpan.textContent = score;
+            checkHighScore();
+            displayHighScores(endHighScoresList);
+            endOverlay.classList.remove('hidden');
+        }
+
+        function checkHighScore() {
+            if (highScores.length < 10 || score > highScores[highScores.length - 1].score) {
+                newHighScoreDiv.classList.remove('hidden');
+            } else {
+                newHighScoreDiv.classList.add('hidden');
+            }
+        }
+
+        function submitHighScore() {
+            const playerName = playerNameInput.value.trim() || 'Anonymous';
+            highScores.push({ name: playerName, score: score });
+            highScores.sort((a, b) => b.score - a.score);
+            if (highScores.length > 10) {
+                highScores.pop();
+            }
+            updateHighScores();
+            newHighScoreDiv.classList.add('hidden');
+            displayHighScores(endHighScoresList);
+        }
+
+        function updateHighScores() {
+            fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Master-Key': API_KEY,
+                    'X-Bin-Versioning': 'false'
+                },
+                body: JSON.stringify({ record: highScores })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('High scores updated successfully');
+            })
+            .catch(error => {
+                console.error('Error updating high scores:', error);
+            });
+        }
+
+        function loadHighScores() {
+            fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
+                method: 'GET',
+                headers: {
+                    'X-Master-Key': API_KEY,
+                    'X-Bin-Meta': 'false'
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                highScores = data.record || [];
+                displayHighScores(highScoresList);
+            })
+            .catch(error => {
+                console.error('Error loading high scores:', error);
+                highScores = [];
+                displayHighScores(highScoresList);
+            });
+        }
+
+        function displayHighScores(listElement) {
+            listElement.innerHTML = '';
+            highScores.forEach((score, index) => {
+                const li = document.createElement('li');
+                li.innerHTML = `<span>${index + 1}. ${score.name}</span> <span>${score.score}</span>`;
+                listElement.appendChild(li);
+            });
+        }
+
+        function resetGame() {
+            bird.y = 300;
+            bird.velocity = 0;
+            pipes = [];
+            score = 0;
+            gameOver = false;
+            gameStarted = true;
+            difficultyTimer = 0;
+            GRAVITY = 0.05;
+            FLAP_STRENGTH = -2.5;
+            PIPE_SPEED = 0.8;
+            PIPE_GAP = 250;
+            createPipe();
+            endOverlay.classList.add('hidden');
+        }
+
+        canvas.addEventListener('click', () => {
+            if (gameStarted && !gameOver) {
+                bird.velocity = FLAP_STRENGTH;
+            }
+        });
+
+        startButton.addEventListener('click', () => {
+            startOverlay.classList.add('hidden');
+            gameStarted = true;
+            createPipe();
+        });
+
+        restartButton.addEventListener('click', () => {
+            resetGame();
+        });
+
+        submitScoreButton.addEventListener('click', () => {
+            submitHighScore();
+            setTimeout(resetGame, 1000); // Delay reset to allow score submission
+        });
+
+        loadHighScores();
+        gameLoop();
+    </script>
+</body>
+</html>

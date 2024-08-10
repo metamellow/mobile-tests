@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.min.js"></script>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #f0f0f0;
+        }
+        .resizing-box {
+            width: 400px;
+            height: 400px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: white;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        canvas {
+            display: block;
+        }
+    </style>
+    <title>Interactive Particle Network</title>
+</head>
+<body>
+    <div class="resizing-box">
+        <div id="particle-network"></div>
+    </div>
+    <script>
+        const COLORS = {
+            background: '#3a134e',
+            particles: ['#FF4793', '#FFB347', '#47FFB3', '#9932cc']
+        };
+
+        let particles = [];
+        let attractor = null;
+
+        function setup() {
+            const canvas = createCanvas(400, 400);
+            canvas.parent('particle-network');
+            for (let i = 0; i < 100; i++) {
+                particles.push(new Particle());
+            }
+        }
+
+        function draw() {
+            background(COLORS.background);
+            
+            // Update and draw particles
+            for (let i = 0; i < particles.length; i++) {
+                particles[i].update();
+                particles[i].show();
+                
+                // Draw lines between particles
+                for (let j = i + 1; j < particles.length; j++) {
+                    let d = dist(particles[i].x, particles[i].y, particles[j].x, particles[j].y);
+                    if (d < 100) {
+                        stroke(255, 255, 255, map(d, 0, 100, 255, 0));
+                        line(particles[i].x, particles[i].y, particles[j].x, particles[j].y);
+                    }
+                }
+            }
+
+            // Draw attractor
+            if (attractor) {
+                fill(255, 100);
+                noStroke();
+                ellipse(attractor.x, attractor.y, 30, 30);
+            }
+        }
+
+        function mousePressed() {
+            attractor = createVector(mouseX, mouseY);
+        }
+
+        function mouseDragged() {
+            attractor = createVector(mouseX, mouseY);
+        }
+
+        function mouseReleased() {
+            attractor = null;
+        }
+
+        // Touch events for mobile
+        function touchStarted() {
+            attractor = createVector(touches[0].x, touches[0].y);
+            return false;
+        }
+
+        function touchMoved() {
+            attractor = createVector(touches[0].x, touches[0].y);
+            return false;
+        }
+
+        function touchEnded() {
+            attractor = null;
+            return false;
+        }
+
+        class Particle {
+            constructor() {
+                this.pos = createVector(random(width), random(height));
+                this.vel = createVector(random(-1, 1), random(-1, 1));
+                this.acc = createVector();
+                this.color = color(random(COLORS.particles));
+                this.maxSpeed = 2;
+                this.maxForce = 0.1;
+            }
+
+            update() {
+                if (attractor) {
+                    let attract = p5.Vector.sub(attractor, this.pos);
+                    attract.setMag(0.5);
+                    this.acc.add(attract);
+                }
+
+                this.vel.add(this.acc);
+                this.vel.limit(this.maxSpeed);
+                this.pos.add(this.vel);
+                this.acc.mult(0);
+
+                this.edges();
+            }
+
+            show() {
+                noStroke();
+                fill(this.color);
+                ellipse(this.pos.x, this.pos.y, 6, 6);
+            }
+
+            edges() {
+                if (this.pos.x > width) this.pos.x = 0;
+                if (this.pos.x < 0) this.pos.x = width;
+                if (this.pos.y > height) this.pos.y = 0;
+                if (this.pos.y < 0) this.pos.y = height;
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.min.js"></script>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #f0f0f0;
+        }
+        .resizing-box {
+            width: 400px;
+            height: 400px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: white;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        canvas {
+            display: block;
+        }
+    </style>
+    <title>Interactive Data Stream</title>
+</head>
+<body>
+    <div class="resizing-box">
+        <div id="data-stream"></div>
+    </div>
+    <script>
+        const COLORS = {
+            background: '#3a134e',
+            stream: ['#FF4793', '#FFB347', '#47FFB3', '#9932cc'],
+            highlight: '#ffffff'
+        };
+
+        let streams = [];
+        let ripple = null;
+
+        function setup() {
+            const canvas = createCanvas(400, 400);
+            canvas.parent('data-stream');
+            for (let i = 0; i < 20; i++) {
+                streams.push(new Stream(i * 20));
+            }
+        }
+
+        function draw() {
+            background(COLORS.background);
+            streams.forEach(stream => {
+                stream.update();
+                stream.display();
+            });
+
+            if (ripple) {
+                ripple.update();
+                ripple.display();
+                if (ripple.isFinished()) {
+                    ripple = null;
+                }
+            }
+        }
+
+        function mousePressed() {
+            ripple = new Ripple(mouseX, mouseY);
+        }
+
+        function touchStarted() {
+            ripple = new Ripple(touches[0].x, touches[0].y);
+            return false;
+        }
+
+        class Stream {
+            constructor(x) {
+                this.x = x;
+                this.symbols = [];
+                this.totalSymbols = round(random(5, 35));
+                this.speed = random(1, 5);
+
+                for (let i = 0; i < this.totalSymbols; i++) {
+                    this.symbols.push(new StreamSymbol(this.x, i * 20, this.speed, color(random(COLORS.stream))));
+                }
+            }
+
+            update() {
+                this.symbols.forEach(symbol => symbol.update());
+            }
+
+            display() {
+                this.symbols.forEach(symbol => symbol.display());
+            }
+        }
+
+        class StreamSymbol {
+            constructor(x, y, speed, symbolColor) {
+                this.x = x;
+                this.y = y;
+                this.speed = speed;
+                this.baseSpeed = speed;
+                this.symbolColor = symbolColor;
+                this.baseColor = symbolColor;
+                this.value = '';
+                this.switchInterval = round(random(2, 20));
+                this.setToRandomSymbol();
+            }
+
+            update() {
+                this.y = (this.y >= height) ? 0 : this.y + this.speed;
+                if (frameCount % this.switchInterval === 0) {
+                    this.setToRandomSymbol();
+                }
+                if (ripple) {
+                    let d = dist(this.x, this.y, ripple.x, ripple.y);
+                    if (d < ripple.radius) {
+                        this.speed = this.baseSpeed * 3;
+                        this.symbolColor = lerpColor(this.baseColor, color(COLORS.highlight), map(d, 0, ripple.radius, 1, 0));
+                    } else {
+                        this.speed = this.baseSpeed;
+                        this.symbolColor = this.baseColor;
+                    }
+                }
+            }
+
+            display() {
+                fill(this.symbolColor);
+                textSize(14);
+                text(this.value, this.x, this.y);
+            }
+
+            setToRandomSymbol() {
+                const charType = floor(random(3));
+                if (charType > 1) {
+                    this.value = String.fromCharCode(0x30A0 + round(random(0, 96)));
+                } else {
+                    this.value = round(random(0, 9)).toString();
+                }
+            }
+        }
+
+        class Ripple {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.radius = 0;
+                this.maxRadius = 100;
+                this.speed = 5;
+            }
+
+            update() {
+                this.radius += this.speed;
+            }
+
+            display() {
+                noFill();
+                stroke(COLORS.highlight);
+                strokeWeight(2);
+                circle(this.x, this.y, this.radius * 2);
+            }
+
+            isFinished() {
+                return this.radius > this.maxRadius;
+            }
+        }
+    </script>
+</body>
+</html>
