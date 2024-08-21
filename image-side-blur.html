@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Square to Rectangle Image Converter</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        #dropZone {
+            border: 2px dashed #ccc;
+            border-radius: 20px;
+            width: 100%;
+            margin: 20px 0;
+            padding: 20px;
+            text-align: center;
+        }
+        #dropZone.highlight {
+            border-color: #00a1ff;
+            background-color: #f0f8ff;
+        }
+        #outputImage {
+            max-width: 100%;
+            display: none;
+            margin-top: 20px;
+        }
+        button {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 15px 32px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        input[type="number"], input[type="range"] {
+            width: 100px;
+            padding: 5px;
+            margin-right: 10px;
+        }
+        #imageStatus {
+            margin-top: 10px;
+            font-weight: bold;
+            color: #4CAF50;
+        }
+        .control-group {
+            margin-bottom: 10px;
+        }
+        label {
+            display: inline-block;
+            width: 120px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Square to Rectangle Image Converter</h1>
+    <div id="dropZone">
+        Drop your square image here or click to select
+        <input type="file" id="fileInput" accept="image/*" style="display: none;">
+    </div>
+    <div id="imageStatus"></div>
+    <div class="control-group">
+        <label for="targetWidth">Target Width:</label>
+        <input type="number" id="targetWidth" value="1600" min="100">
+    </div>
+    <div class="control-group">
+        <label for="blurStrength">Blur Strength:</label>
+        <input type="range" id="blurStrength" min="1" max="50" value="20">
+        <span id="blurStrengthValue">20</span>
+    </div>
+    <button onclick="processImage()">Process Image</button>
+    <img id="outputImage" alt="Processed Image">
+
+    <script>
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const outputImage = document.getElementById('outputImage');
+        const targetWidthInput = document.getElementById('targetWidth');
+        const imageStatus = document.getElementById('imageStatus');
+        const blurStrengthInput = document.getElementById('blurStrength');
+        const blurStrengthValue = document.getElementById('blurStrengthValue');
+
+        blurStrengthInput.addEventListener('input', function() {
+            blurStrengthValue.textContent = this.value;
+        });
+
+        // Set up the drop zone event listeners
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, highlight, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, unhighlight, false);
+        });
+
+        function highlight() {
+            dropZone.classList.add('highlight');
+        }
+
+        function unhighlight() {
+            dropZone.classList.remove('highlight');
+        }
+
+        dropZone.addEventListener('drop', handleDrop, false);
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            handleFiles(files);
+        }
+
+        dropZone.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', () => handleFiles(fileInput.files));
+
+        function handleFiles(files) {
+            if (files.length > 0) {
+                const file = files[0];
+                if (file.type.startsWith('image/')) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            window.uploadedImage = img;
+                            imageStatus.textContent = `Image loaded: ${file.name}`;
+                        };
+                        img.src = e.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                } else {
+                    alert('Please upload an image file.');
+                }
+            }
+        }
+
+        function processImage() {
+            if (!window.uploadedImage) {
+                alert('Please upload an image first.');
+                return;
+            }
+
+            const img = window.uploadedImage;
+            const targetWidth = parseInt(targetWidthInput.value, 10);
+            const blurStrength = parseInt(blurStrengthInput.value, 10);
+
+            if (isNaN(targetWidth) || targetWidth < 100) {
+                alert('Please enter a valid target width (minimum 100 pixels).');
+                return;
+            }
+
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+
+            // Set canvas size
+            canvas.width = targetWidth;
+            canvas.height = img.height;
+
+            // Calculate the width of the extension on each side
+            const extensionWidth = (targetWidth - img.width) / 2;
+
+            // Function to apply adjustable blur
+            function applyBlur(sourceCanvas, strength) {
+                const blurCanvas = document.createElement('canvas');
+                blurCanvas.width = sourceCanvas.width;
+                blurCanvas.height = sourceCanvas.height;
+                const blurCtx = blurCanvas.getContext('2d');
+
+                blurCtx.drawImage(sourceCanvas, 0, 0);
+
+                for (let i = 0; i < strength; i++) {
+                    blurCtx.filter = `blur(${strength}px)`;
+                    blurCtx.drawImage(blurCanvas, 0, 0);
+                }
+                blurCtx.filter = 'none';
+
+                return blurCanvas;
+            }
+
+            // Create left blurred extension
+            const leftCanvas = document.createElement('canvas');
+            leftCanvas.width = extensionWidth;
+            leftCanvas.height = img.height;
+            const leftCtx = leftCanvas.getContext('2d');
+            leftCtx.drawImage(img, 0, 0);
+            const blurredLeft = applyBlur(leftCanvas, blurStrength);
+
+            // Create right blurred extension
+            const rightCanvas = document.createElement('canvas');
+            rightCanvas.width = extensionWidth;
+            rightCanvas.height = img.height;
+            const rightCtx = rightCanvas.getContext('2d');
+            rightCtx.drawImage(img, -img.width + extensionWidth, 0);
+            const blurredRight = applyBlur(rightCanvas, blurStrength);
+
+            // Combine everything on the main canvas
+            ctx.drawImage(blurredLeft, 0, 0);
+            ctx.drawImage(img, extensionWidth, 0);
+            ctx.drawImage(blurredRight, canvas.width - extensionWidth, 0);
+
+            // Display the result
+            outputImage.src = canvas.toDataURL('image/jpeg');
+            outputImage.style.display = 'block';
+        }
+    </script>
+</body>
+</html>
