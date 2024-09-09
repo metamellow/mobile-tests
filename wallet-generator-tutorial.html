@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Magic of Wallet Addresses</title>
+    <script src="https://cdn.ethers.io/lib/ethers-5.0.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <style>
+        body {
+            font-family: monospace;
+            background-color: #000;
+            color: #00ff00;
+            padding: 20px;
+        }
+        #output {
+            white-space: pre-wrap;
+        }
+        button {
+            margin-top: 20px;
+            padding: 10px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div id="output"></div>
+    <button id="nextStep">Next Step</button>
+
+    <script>
+        const output = document.getElementById('output');
+        const nextStepButton = document.getElementById('nextStep');
+        let currentStep = 0;
+        const totalSteps = 7;
+
+        function log(message) {
+            output.innerHTML += message + '\n';
+        }
+
+        function displayProgressBox(step) {
+    const percentage = Math.round((step / totalSteps) * 100);
+    const progressBarWidth = 20;
+    const filledWidth = Math.round((percentage / 100) * progressBarWidth);
+    const emptyWidth = progressBarWidth - filledWidth;
+    const progressBar = '='.repeat(filledWidth) + ' '.repeat(emptyWidth);
+    
+    log(`
++----------------------------------+
+|                                  |
+|        WALLET GENERATOR          |
+|                                  |
+|        Processing...             |
+|                                  |
+|     [${progressBar}] ${percentage.toString().padStart(3)}%  |
+|                                  |
++----------------------------------+
+`);
+}
+
+        function displayInfo(title, value, description) {
+            log(`${title}: ${value}\n`);
+            log(`  ┗━ ${description}\n`);
+        }
+
+        async function generateWallet() {
+            log('Starting wallet generation process...');
+
+            // Step 1: Generate a random mnemonic (seed phrase)
+            await stepPrompt('[STEP 1] Generating random mnemonic (seed phrase)...');
+            const entropy = CryptoJS.lib.WordArray.random(16);
+            const entropyHex = entropy.toString(CryptoJS.enc.Hex);
+            const mnemonic = ethers.utils.entropyToMnemonic('0x' + entropyHex);
+            displayInfo('Entropy', entropyHex, 
+                "Random data used as the basis for generating the mnemonic. " +
+                "Ensures the uniqueness and security of the wallet.");
+            displayInfo('Mnemonic', mnemonic, 
+                "A series of words representing the wallet's seed. " +
+                "Used for backup and recovery of the wallet.");
+
+            // Step 2: Derive the seed from the mnemonic
+            await stepPrompt('[STEP 2] Deriving seed from mnemonic...');
+            const hdNode = ethers.utils.HDNode.fromMnemonic(mnemonic);
+            const seed = hdNode.privateKey;
+            displayInfo('Seed', seed, 
+                "A large number derived from the mnemonic. " +
+                "Serves as the root for generating all keys in the wallet.");
+
+            // Step 3: Derive the master private key and chain code
+            await stepPrompt('[STEP 3] Deriving master private key and chain code...');
+            displayInfo('Master Private Key', hdNode.privateKey, 
+                "The root private key of the hierarchical deterministic wallet. " +
+                "Used to derive all other keys in the wallet structure.");
+            displayInfo('Chain Code', hdNode.chainCode, 
+                "Additional entropy used in the derivation of child keys. " +
+                "Ensures that compromising a child key doesn't compromise the entire wallet.");
+
+            // Step 4: Derive the first account's private key (m/44'/60'/0'/0/0)
+            await stepPrompt("[STEP 4] Deriving first account's private key...");
+            const derivationPath = "m/44'/60'/0'/0/0";
+            const firstAccount = hdNode.derivePath(derivationPath);
+            const privateKey = firstAccount.privateKey;
+            displayInfo('Derivation Path', derivationPath, 
+                "A standardized way to generate keys in a hierarchical structure. " +
+                "Allows for consistent key generation across different wallet implementations.");
+            displayInfo('Private Key', privateKey, 
+                "The secret key used to sign transactions and prove ownership. " +
+                "Must be kept secure and never shared.");
+
+            // Step 5: Compute the public key
+            await stepPrompt('[STEP 5] Computing public key...');
+            const publicKey = ethers.utils.computePublicKey(privateKey, true);
+            displayInfo('Public Key (compressed)', publicKey, 
+                "A shortened form of the public key. " +
+                "Used in some blockchain systems to save space.");
+            const uncompressedPublicKey = ethers.utils.computePublicKey(privateKey, false);
+            displayInfo('Public Key (uncompressed)', uncompressedPublicKey, 
+                "The full public key derived from the private key. " +
+                "Used to verify signatures and derive the Ethereum address.");
+
+            // Step 6: Compute the Ethereum address
+            await stepPrompt('[STEP 6] Computing Ethereum address...');
+            const address = ethers.utils.computeAddress(privateKey);
+            displayInfo('Address', address, 
+                "The public identifier for the Ethereum account. " +
+                "Used to receive funds and interact with the Ethereum network.");
+
+            // Step 7: Create checksum address
+            await stepPrompt('[STEP 7] Creating checksum address...');
+            const checksumAddress = ethers.utils.getAddress(address);
+            displayInfo('Checksum Address', checksumAddress, 
+                "A case-sensitive version of the Ethereum address. " +
+                "Helps detect errors when typing or copying addresses.");
+
+            log('Wallet generation complete!');
+        }
+
+        function stepPrompt(stepDescription) {
+            return new Promise((resolve) => {
+                log('\n========================================');
+                displayProgressBox(++currentStep);
+                log(`${stepDescription}\nClick 'Next Step' to continue...\n`);
+                nextStepButton.onclick = resolve;
+            });
+        }
+
+        // Start the process
+        generateWallet();
+    </script>
+</body>
+</html>
