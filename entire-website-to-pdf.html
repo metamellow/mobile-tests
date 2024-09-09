@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Documentation PDF Generator</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; margin: 0; padding: 20px; background-color: #f4f4f4; }
+        .container { max-width: 800px; margin: auto; background: white; padding: 20px; border-radius: 5px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1, h2 { color: #333; }
+        #tips { background-color: #e7f3fe; border-left: 6px solid #2196F3; margin-bottom: 15px; padding: 10px; }
+        #status, #log { margin-top: 20px; border: 1px solid #ddd; padding: 10px; height: 200px; overflow-y: auto; }
+        input[type="url"] { width: 100%; padding: 8px; margin-top: 5px; }
+        button { background-color: #4CAF50; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; margin-top: 10px; }
+        button:hover { background-color: #45a049; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Documentation PDF Generator</h1>
+        <div id="tips">
+            <h3>Usage Tips:</h3>
+            <ul>
+                <li>Enter the URL of the main documentation page or overview page.</li>
+                <li>The tool will crawl linked pages and compile them into a single PDF.</li>
+                <li>The process may take a few minutes depending on the number of pages.</li>
+                <li>Make sure you have a stable internet connection during the process.</li>
+                <li>This tool works best with documentation sites that have a clear structure.</li>
+            </ul>
+        </div>
+        <form id="crawlForm">
+            <label for="startUrl">Documentation URL:</label>
+            <input type="url" id="startUrl" required placeholder="https://docs.example.com/overview">
+            <button type="submit">Generate PDF</button>
+        </form>
+        <h2>Status</h2>
+        <div id="status"></div>
+        <h2>Log</h2>
+        <div id="log"></div>
+    </div>
+
+    <script>
+        const { jsPDF } = window.jspdf;
+        const form = document.getElementById('crawlForm');
+        const statusDiv = document.getElementById('status');
+        const logDiv = document.getElementById('log');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const startUrl = document.getElementById('startUrl').value;
+            
+            updateStatus('Starting PDF generation...');
+            logDiv.innerHTML = '';
+
+            try {
+                const pages = await fetchAllPages(startUrl);
+                await generatePDF(pages);
+                updateStatus('PDF generated and downloaded!');
+            } catch (error) {
+                updateStatus(`Error: ${error.message}`);
+                console.error(error);
+            }
+        });
+
+        async function fetchAllPages(startUrl) {
+            updateStatus('Fetching main page...');
+            const mainContent = await fetchWithRetry(startUrl);
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(mainContent, 'text/html');
+            
+            const links = doc.querySelectorAll('a[href]');
+            const pages = [{ title: doc.title || 'Main Page', content: extractContent(doc) }];
+            const baseUrl = new URL(startUrl).origin;
+            const visited = new Set([startUrl]);
+
+            for (const link of links) {
+                const url = new URL(link.getAttribute('href'), startUrl).href;
+                if (url.startsWith(baseUrl) && !visited.has(url)) {
+                    visited.add(url);
+                    const title = link.textContent.trim();
+                    updateStatus(`Fetching: ${title}`);
+                    try {
+                        const content = await fetchWithRetry(url);
+                        const pageDoc = parser.parseFromString(content, 'text/html');
+                        pages.push({
+                            title: pageDoc.title || title,
+                            content: extractContent(pageDoc)
+                        });
+                        log(`Fetched: ${title}`);
+                    } catch (error) {
+                        log(`Error fetching ${title}: ${error.message}`);
+                    }
+                }
+            }
+            return pages;
+        }
+
+        async function fetchWithRetry(url, maxRetries = 3, delay = 1000) {
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    const response = await fetch(url);
+                    return await response.text();
+                } catch (error) {
+                    console.error(`Attempt ${i + 1} failed: ${error.message}`);
+                }
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
+            throw new Error(`Failed to fetch ${url} after ${maxRetries} attempts`);
+        }
+
+        function extractContent(doc) {
+            const content = doc.querySelector('main') || doc.querySelector('article') || doc.body;
+            if (!content) return 'Content not found';
+
+            // Remove navigation elements and scripts
+            const elementsToRemove = content.querySelectorAll('nav, script, .pagination-nav, .theme-edit-this-page');
+            elementsToRemove.forEach(el => el.remove());
+
+            return content.innerHTML;
+        }
+
+        async function generatePDF(pages) {
+            updateStatus('Generating PDF...');
+            const doc = new jsPDF();
+            let y = 20;
+
+            // Add title page
+            doc.setFontSize(24);
+            doc.text('Documentation', 105, y, { align: 'center' });
+            y += 20;
+
+            // Add table of contents
+            doc.setFontSize(18);
+            doc.text('Table of Contents', 105, y, { align: 'center' });
+            y += 10;
+            doc.setFontSize(12);
+
+            const pageNumbers = {};
+            let currentPage = 2; // Start from page 2 (after TOC)
+
+            pages.forEach((page, index) => {
+                pageNumbers[index] = currentPage;
+                doc.text(`${index + 1}. ${page.title}`, 20, y);
+                doc.text(`${currentPage}`, 180, y, { align: 'right' });
+                y += 10;
+                if (y > 280) {
+                    doc.addPage();
+                    y = 20;
+                }
+                currentPage++;
+            });
+
+            // Add content pages
+            for (let [index, page] of pages.entries()) {
+                doc.addPage();
+                y = 20;
+                
+                doc.setFontSize(16);
+                doc.text(page.title, 20, y);
+                y += 10;
+                
+                doc.setFontSize(12);
+                const contentDiv = document.createElement('div');
+                contentDiv.innerHTML = page.content;
+                
+                const elements = contentDiv.querySelectorAll('p, h1, h2, h3, h4, h5, h6, ul, ol, li, a, pre, code, table');
+                for (let el of elements) {
+                    try {
+                        switch (el.tagName.toLowerCase()) {
+                            case 'h1':
+                            case 'h2':
+                            case 'h3':
+                            case 'h4':
+                            case 'h5':
+                            case 'h6':
+                                doc.setFontSize(18 - parseInt(el.tagName.charAt(1)) * 2);
+                                doc.setFont(undefined, 'bold');
+                                break;
+                            case 'a':
+                                doc.setTextColor(0, 0, 255);
+                                break;
+                            case 'pre':
+                            case 'code':
+                                doc.setFont('Courier');
+                                doc.setFontSize(10);
+                                break;
+                            case 'table':
+                                y = await handleTable(doc, el, y);
+                                continue;
+                            default:
+                                doc.setFontSize(12);
+                                doc.setFont('Helvetica', 'normal');
+                                doc.setTextColor(0);
+                        }
+
+                        if (el.tagName.toLowerCase() === 'li') {
+                            doc.text('• ', 20, y);
+                        }
+
+                        const text = el.textContent.trim();
+                        const lines = doc.splitTextToSize(text, 170);
+                        for (let line of lines) {
+                            if (y > 280) {
+                                doc.addPage();
+                                y = 20;
+                            }
+                            doc.text(line, el.tagName.toLowerCase() === 'li' ? 25 : 20, y);
+                            y += 7;
+                        }
+                        y += 5; // Add some space between elements
+                    } catch (error) {
+                        console.error(`Error processing element: ${error.message}`);
+                    }
+                }
+
+                // Add page number
+                doc.setFontSize(10);
+                doc.text(`Page ${pageNumbers[index]}`, 105, 290, { align: 'center' });
+            }
+
+            doc.save('documentation.pdf');
+        }
+
+        async function handleTable(doc, table, startY) {
+            const headers = Array.from(table.querySelectorAll('th')).map(th => th.textContent.trim());
+            const rows = Array.from(table.querySelectorAll('tr')).map(tr => 
+                Array.from(tr.querySelectorAll('td')).map(td => td.textContent.trim())
+            ).filter(row => row.length > 0);
+
+            const data = [headers, ...rows];
+            const cellWidth = 170 / headers.length;
+            const cellPadding = 2;
+            const lineHeight = 7;
+
+            let y = startY;
+
+            // Draw headers
+            doc.setFont(undefined, 'bold');
+            headers.forEach((header, index) => {
+                doc.text(header, 20 + index * cellWidth, y);
+            });
+            y += lineHeight + cellPadding;
+
+            // Draw rows
+            doc.setFont(undefined, 'normal');
+            rows.forEach(row => {
+                const rowHeight = Math.max(...row.map(cell => doc.splitTextToSize(cell, cellWidth - 2).length)) * lineHeight;
+                if (y + rowHeight > 280) {
+                    doc.addPage();
+                    y = 20;
+                }
+                row.forEach((cell, index) => {
+                    const lines = doc.splitTextToSize(cell, cellWidth - 2);
+                    lines.forEach((line, lineIndex) => {
+                        doc.text(line, 20 + index * cellWidth, y + lineIndex * lineHeight);
+                    });
+                });
+                y += rowHeight + cellPadding;
+            });
+
+            return y;
+        }
+
+        function updateStatus(message) {
+            statusDiv.textContent = message;
+        }
+
+        function log(message) {
+            const logEntry = document.createElement('div');
+            logEntry.textContent = message;
+            logDiv.appendChild(logEntry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+    </script>
+</body>
+</html>
