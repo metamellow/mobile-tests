@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lunar New Year Red Packet Game</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+      background: linear-gradient(to bottom, #ffb347, #ffcc33);
+    }
+    canvas {
+      display: block;
+    }
+    #gameOverScreen {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      font-size: 24px;
+      visibility: hidden;
+      z-index: 2;
+    }
+    #gameOverScreen button {
+      margin-top: 20px;
+      padding: 10px 20px;
+      font-size: 18px;
+      background-color: #ff4444;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div id="gameOverScreen">
+    <div id="finalScore">Your Score: 0</div>
+    <button onclick="restartGame()">Restart</button>
+  </div>
+  <canvas id="gameCanvas"></canvas>
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const basketImg = new Image();
+    basketImg.src = "https://emojis.wiki/emoji-pics/apple/open-hands-apple.png"; // Placeholder basket image
+    const packetImg = new Image();
+    packetImg.src = "https://emojings.com/wp-content/uploads/2021/04/red-envelope-4.png"; // Placeholder red packet image
+
+    let basket = {
+      x: canvas.width / 2 - 50,
+      y: canvas.height - 100,
+      width: 100,
+      height: 50,
+      dx: 0,
+    };
+    let packets = [];
+    let score = 0;
+    let misses = 0;
+    let maxMisses = 3;
+    let gameRunning = true;
+
+    const gameOverScreen = document.getElementById("gameOverScreen");
+    const finalScore = document.getElementById("finalScore");
+
+    function createPacket() {
+      const size = 50;
+      packets.push({
+        x: Math.random() * (canvas.width - size),
+        y: -size,
+        width: size,
+        height: size,
+        speed: Math.random() * 3 + 2,
+      });
+    }
+
+    function moveBasket(x) {
+      basket.x = x - basket.width / 2;
+      if (basket.x < 0) basket.x = 0;
+      if (basket.x + basket.width > canvas.width) basket.x = canvas.width - basket.width;
+    }
+
+    function update() {
+      if (!gameRunning) return;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Draw basket
+      ctx.drawImage(basketImg, basket.x, basket.y, basket.width, basket.height);
+
+      // Update packets
+      for (let i = packets.length - 1; i >= 0; i--) {
+        const packet = packets[i];
+        packet.y += packet.speed;
+
+        // Check collision with basket
+        if (
+          packet.x < basket.x + basket.width &&
+          packet.x + packet.width > basket.x &&
+          packet.y + packet.height > basket.y &&
+          packet.y < basket.y + basket.height
+        ) {
+          score++;
+          packets.splice(i, 1);
+          continue;
+        }
+
+        // Check if packet missed
+        if (packet.y > canvas.height) {
+          misses++;
+          packets.splice(i, 1);
+        }
+
+        // Draw packet
+        ctx.drawImage(packetImg, packet.x, packet.y, packet.width, packet.height);
+      }
+
+      // Draw score
+      ctx.fillStyle = "black";
+      ctx.font = "20px Arial";
+      ctx.fillText("Score: " + score, 10, 30);
+      ctx.fillText("Misses: " + misses + "/" + maxMisses, canvas.width - 150, 30);
+
+      if (misses >= maxMisses) endGame();
+      requestAnimationFrame(update);
+    }
+
+    function endGame() {
+      gameRunning = false;
+      finalScore.textContent = "Your Score: " + score;
+      gameOverScreen.style.visibility = "visible";
+    }
+
+    function restartGame() {
+      gameRunning = true;
+      packets = [];
+      score = 0;
+      misses = 0;
+      gameOverScreen.style.visibility = "hidden";
+      requestAnimationFrame(update);
+    }
+
+    canvas.addEventListener("mousemove", (e) => {
+      if (gameRunning) moveBasket(e.clientX);
+    });
+
+    canvas.addEventListener("touchmove", (e) => {
+      if (gameRunning) moveBasket(e.touches[0].clientX);
+    });
+
+    setInterval(() => {
+      if (gameRunning) createPacket();
+    }, 1000);
+
+    requestAnimationFrame(update);
+  </script>
+</body>
+</html>
