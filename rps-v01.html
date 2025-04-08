@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rock Paper Scissors DApp (v0.1)</title>
+    <title>Rock Paper Scissors DApp</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Fira+Code&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -1344,6 +1344,7 @@
                             // First state update - show player's choice
                             if (!lastGameState) {
                                 Logger.log(`Player chose ${["ROCK", "PAPER", "SCISSORS"][game.choice]}`, 'info');
+                                Logger.log('Waiting for Chainlink VRF response (this may take 10-20 seconds)...', 'info');
                             }
 
                             // Computer choice update (only if it's a valid choice and result is set)
@@ -1447,6 +1448,34 @@
                     `Pending Rewards: ${formattedRewards} BNB`;
                 
                 document.getElementById('claimButton').disabled = rewards.isZero();
+            } catch (error) {
+                Logger.error(error);
+            }
+        }
+
+        async function claimRewards() {
+            try {
+                if (!state.contract || !state.userAddress) {
+                    throw new DAppError('Please connect your wallet first', 'NO_WALLET');
+                }
+
+                const rewards = await state.contract.pendingRewards(state.userAddress);
+                if (rewards.isZero()) {
+                    throw new DAppError('No rewards to claim', 'NO_REWARDS');
+                }
+
+                Logger.log('Claiming rewards...');
+                
+                const tx = await state.contract.claimRewards();
+                
+                Logger.log(`Claim transaction sent: ${tx.hash}`);
+                
+                const receipt = await tx.wait();
+                Logger.log(`Claim confirmed in block ${receipt.blockNumber}`, 'success');
+                
+                // Update UI
+                await updatePendingRewards();
+                
             } catch (error) {
                 Logger.error(error);
             }
