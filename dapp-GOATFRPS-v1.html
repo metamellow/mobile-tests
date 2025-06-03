@@ -1,0 +1,1701 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FauxRockPaperScissors Test DApp</title>
+  <style>
+    body { background: #181c20; color: #fff; font-family: 'Inter', sans-serif; margin: 0; padding: 0; }
+    .container { max-width: 500px; margin: 40px auto; background: #23272b; border-radius: 12px; box-shadow: 0 2px 12px #0004; padding: 2rem; }
+    h1 { font-size: 1.7rem; margin-bottom: 1rem; }
+    button { background: #4caf50; color: #fff; border: none; border-radius: 6px; padding: 0.7em 1.5em; font-size: 1rem; cursor: pointer; margin: 0.5em 0; }
+    button:disabled { opacity: 0.5; }
+    .info { margin: 1em 0; padding: 1em; background: #222; border-radius: 8px; }
+    .label { color: #aaa; font-size: 0.95em; }
+    .result { background: #111; padding: 0.7em; border-radius: 6px; margin-top: 0.5em; }
+    .error { color: #f44336; }
+    .card { background: #23272b; border-radius: 8px; padding: 1.5rem; margin-bottom: 1rem; }
+    .btn { background: #4caf50; color: #fff; border: none; border-radius: 6px; padding: 0.7em 1.5em; font-size: 1rem; cursor: pointer; margin: 0.5em 0; }
+    .btn-primary { background: #4caf50; }
+    .event-log { background: #111; padding: 1em; border-radius: 8px; max-height: 200px; overflow: auto; font-size: 0.95em; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Welcome/Connect Section -->
+    <div id="welcomeSection" class="card">
+      <h1>FauxRockPaperScissors DApp</h1>
+      <p>Connect your wallet to start playing!</p>
+      <button id="connectBtn" class="btn btn-primary">Connect Wallet</button>
+      <div id="walletAddress" class="info" style="display:none;"></div>
+    </div>
+
+    <!-- Main Interface -->
+    <div id="mainInterface" style="display:none;">
+      <!-- Event Log (moved up) -->
+      <div class="card">
+        <h2>Event Log</h2>
+        <div id="eventLog" class="event-log"></div>
+      </div>
+      <!-- Game Info Section -->
+      <div class="card">
+        <h2>Game Info</h2>
+        <div class="info">
+          <div><span class="label">Contract Address:</span> <span id="contractAddr"></span></div>
+          <div><span class="label">Owner:</span> <span id="owner"></span></div>
+          <div><span class="label">Paused:</span> <span id="paused"></span></div>
+          <div><span class="label">Min Bet:</span> <span id="minBet"></span></div>
+          <div><span class="label">House Fee %:</span> <span id="houseFee"></span></div>
+          <div><span class="label">minVrfBalance:</span> <span id="minVrfBalance"></span></div>
+          <div><span class="label">Callback Gas Limit:</span> <span id="callbackGasLimit"></span></div>
+          <div><span class="label">Request Confirmations:</span> <span id="requestConfirmations"></span></div>
+          <div><span class="label">AVAX Balance:</span> <span id="avaxBalance"></span></div>
+          <div><span class="label">ERC20 Balance:</span> <span id="erc20Balance"></span></div>
+          <div><span class="label">Fees (ERC20):</span> <span id="fees"></span></div>
+          <div><span class="label">Fees (AVAX):</span> <span id="feesAVAX"></span></div>
+        </div>
+        <button id="refreshBtn">Refresh Info</button>
+      </div>
+
+      <!-- Game Actions Section -->
+      <div class="card">
+        <h2>Game Actions</h2>
+        <div class="info">
+          <div>
+            <b>Create Game (ERC20):</b><br>
+            Bet: <input id="erc20Bet" type="number" min="0.01" step="0.01" value="0.01"> <br>
+            Choice: <select id="erc20Choice"><option value="1">Rock</option><option value="2">Paper</option><option value="3">Scissors</option></select>
+            <button id="createErc20Btn">Create</button>
+          </div>
+          <div style="margin-top:1em;">
+            <b>Create Game (AVAX):</b><br>
+            Bet: <input id="avaxBet" type="number" min="0.01" step="0.01" value="0.01"> <br>
+            Choice: <select id="avaxChoice"><option value="1">Rock</option><option value="2">Paper</option><option value="3">Scissors</option></select>
+            <button id="createAvaxBtn">Create</button>
+          </div>
+          <div style="margin-top:1em;">
+            <b>Join Game:</b><br>
+            <div id="activeGamesList">Loading active games...</div>
+            <div id="joinGameDetails" style="display:none; margin-top:1em;"></div>
+          </div>
+          <div style="margin-top:1em;">
+            <b>Cancel Game:</b><br>
+            Game ID: <input id="cancelGameId" type="number" min="0"> <button id="cancelBtn">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Game Views Section -->
+      <div class="card">
+        <h2>Game Views</h2>
+        <div class="info">
+          <button id="getActiveBtn">Get Active Games</button>
+          <button id="getFinishedBtn">Get Finished Games</button>
+          <button id="getStatsBtn">Get My Stats</button>
+          <button id="getBalancesBtn">Get Contract Balances</button>
+          <div id="activeGames" class="result"></div>
+          <div id="finishedGames" class="result"></div>
+          <div id="myStats" class="result"></div>
+          <div id="contractBalances" class="result"></div>
+        </div>
+      </div>
+
+      <!-- Admin Panel (hidden unless owner) -->
+      <div id="adminPanel" class="card" style="display:none;">
+        <h2>Admin Panel</h2>
+        <div class="info">
+          <div style="margin-top:1em;">
+            <button id="pauseBtn">Pause</button>
+            <button id="unpauseBtn">Unpause</button>
+          </div>
+          <div style="margin-top:1em;">
+            <button id="withdrawBtn">Withdraw Fees</button>
+            <button id="emergencyBtn">Emergency Withdraw</button>
+          </div>
+          <div style="margin-top:1em;">
+            <b>Emergency Cancel Game:</b>
+            <input id="emCancelId" type="number" min="1" placeholder="Game ID">
+            <button id="emCancelBtn">Cancel</button>
+          </div>
+          <div style="margin-top:1em;">
+            <b>Set Config (leave blank to keep current):</b><br>
+            Game Token: <input id="setGameToken" type="text" style="width:250px;" placeholder="0x..."><br>
+            House Fee (basis points): <input id="setHouseFee" type="number" min="0" max="10000" step="1" placeholder="0"><br>
+            Min Bet (ETH): <input id="setMinBet" type="number" min="0" step="any" placeholder="0"><br>
+            Callback Gas Limit: <input id="setGas" type="number" min="0" placeholder="0"><br>
+            Confirmations: <input id="setConf" type="number" min="0" placeholder="0"><br>
+            Min VRF Balance (ETH): <input id="setVrfBal" type="number" min="0" step="any" placeholder="0"><br>
+            <button id="setConfigBtn">Set Config</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="errorMsg" class="error"></div>
+  </div>
+
+  <!-- Ethers.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
+  <!-- Contract ABI -->
+  <script id="abiScript" type="application/json">
+    [
+    {
+      "inputs": [],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "have",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "want",
+          "type": "address"
+        }
+      ],
+      "name": "OnlyVRFWrapperCanFulfill",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "owner",
+          "type": "address"
+        }
+      ],
+      "name": "OwnableInvalidOwner",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "OwnableUnauthorizedAccount",
+      "type": "error"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "id",
+          "type": "uint256"
+        }
+      ],
+      "name": "GameCancelled",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "id",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "p1",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "bet",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "enum FauxRockPaperScissors.Choice",
+          "name": "p1Choice",
+          "type": "uint8"
+        },
+        {
+          "indexed": false,
+          "internalType": "enum FauxRockPaperScissors.PaymentType",
+          "name": "paymentType",
+          "type": "uint8"
+        }
+      ],
+      "name": "GameCreated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "id",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "p2",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "enum FauxRockPaperScissors.Choice",
+          "name": "p2Choice",
+          "type": "uint8"
+        }
+      ],
+      "name": "GameJoined",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "id",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "winner",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "winnings",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "bool",
+          "name": "isTie",
+          "type": "bool"
+        }
+      ],
+      "name": "GameResolved",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "previousOwner",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "newOwner",
+          "type": "address"
+        }
+      ],
+      "name": "OwnershipTransferred",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "bool",
+          "name": "isMaxApproval",
+          "type": "bool"
+        }
+      ],
+      "name": "TokenApproval",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "id",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "requestId",
+          "type": "uint256"
+        }
+      ],
+      "name": "VRFRequested",
+      "type": "event"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "active",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "activeGameIndex",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_betAmount",
+          "type": "uint256"
+        }
+      ],
+      "name": "approveBetAmount",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "approveMaxAmount",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "callbackGasLimit",
+      "outputs": [
+        {
+          "internalType": "uint32",
+          "name": "",
+          "type": "uint32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_id",
+          "type": "uint256"
+        }
+      ],
+      "name": "cancel",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_user",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "_betAmount",
+          "type": "uint256"
+        }
+      ],
+      "name": "checkApproval",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "enum FauxRockPaperScissors.Choice",
+          "name": "_choice",
+          "type": "uint8"
+        }
+      ],
+      "name": "createGameAVAX",
+      "outputs": [],
+      "stateMutability": "payable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_bet",
+          "type": "uint256"
+        },
+        {
+          "internalType": "enum FauxRockPaperScissors.Choice",
+          "name": "_choice",
+          "type": "uint8"
+        }
+      ],
+      "name": "createGameERC20",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "emergency",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_id",
+          "type": "uint256"
+        }
+      ],
+      "name": "emergencyCancel",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "fees",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "feesAVAX",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "finished",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "gameId",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "gameToken",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "games",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "p1",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "p2",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "bet",
+          "type": "uint256"
+        },
+        {
+          "internalType": "enum FauxRockPaperScissors.Choice",
+          "name": "p1Choice",
+          "type": "uint8"
+        },
+        {
+          "internalType": "enum FauxRockPaperScissors.Choice",
+          "name": "p2Choice",
+          "type": "uint8"
+        },
+        {
+          "internalType": "enum FauxRockPaperScissors.PaymentType",
+          "name": "paymentType",
+          "type": "uint8"
+        },
+        {
+          "internalType": "enum FauxRockPaperScissors.State",
+          "name": "state",
+          "type": "uint8"
+        },
+        {
+          "internalType": "address",
+          "name": "winner",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "created",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "resolvedAt",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "vrfRequestId",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getActive",
+      "outputs": [
+        {
+          "internalType": "uint256[]",
+          "name": "",
+          "type": "uint256[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getActiveCount",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getBalance",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getContractBalances",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "tokenBalance",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "avaxBalance",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "fees_",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "feesAVAX_",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_limit",
+          "type": "uint256"
+        }
+      ],
+      "name": "getFinished",
+      "outputs": [
+        {
+          "internalType": "uint256[]",
+          "name": "",
+          "type": "uint256[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getFinishedCount",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_id",
+          "type": "uint256"
+        }
+      ],
+      "name": "getGame",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "address",
+              "name": "p1",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "p2",
+              "type": "address"
+            },
+            {
+              "internalType": "uint256",
+              "name": "bet",
+              "type": "uint256"
+            },
+            {
+              "internalType": "enum FauxRockPaperScissors.Choice",
+              "name": "p1Choice",
+              "type": "uint8"
+            },
+            {
+              "internalType": "enum FauxRockPaperScissors.Choice",
+              "name": "p2Choice",
+              "type": "uint8"
+            },
+            {
+              "internalType": "enum FauxRockPaperScissors.PaymentType",
+              "name": "paymentType",
+              "type": "uint8"
+            },
+            {
+              "internalType": "enum FauxRockPaperScissors.State",
+              "name": "state",
+              "type": "uint8"
+            },
+            {
+              "internalType": "address",
+              "name": "winner",
+              "type": "address"
+            },
+            {
+              "internalType": "uint256",
+              "name": "created",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "resolvedAt",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "vrfRequestId",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct FauxRockPaperScissors.Game",
+          "name": "",
+          "type": "tuple"
+        },
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getLinkToken",
+      "outputs": [
+        {
+          "internalType": "contract LinkTokenInterface",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_player",
+          "type": "address"
+        }
+      ],
+      "name": "getPlayerActiveGames",
+      "outputs": [
+        {
+          "internalType": "uint256[]",
+          "name": "",
+          "type": "uint256[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_player",
+          "type": "address"
+        }
+      ],
+      "name": "getStats",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "played",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "won",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "bet",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "winnings",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "ties",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct FauxRockPaperScissors.Stats",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "houseFeePercentage",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "i_vrfV2PlusWrapper",
+      "outputs": [
+        {
+          "internalType": "contract IVRFV2PlusWrapper",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_id",
+          "type": "uint256"
+        },
+        {
+          "internalType": "enum FauxRockPaperScissors.Choice",
+          "name": "_choice",
+          "type": "uint8"
+        }
+      ],
+      "name": "joinGame",
+      "outputs": [],
+      "stateMutability": "payable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "minBetAmount",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "minVrfBalance",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "numWords",
+      "outputs": [
+        {
+          "internalType": "uint32",
+          "name": "",
+          "type": "uint32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "owner",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "paused",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "playerActiveGames",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_requestId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256[]",
+          "name": "_randomWords",
+          "type": "uint256[]"
+        }
+      ],
+      "name": "rawFulfillRandomWords",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "renounceOwnership",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "requestConfirmations",
+      "outputs": [
+        {
+          "internalType": "uint16",
+          "name": "",
+          "type": "uint16"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_gameToken",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "_houseFee",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "_minBet",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint32",
+          "name": "_callbackGasLimit",
+          "type": "uint32"
+        },
+        {
+          "internalType": "uint16",
+          "name": "_requestConfirmations",
+          "type": "uint16"
+        },
+        {
+          "internalType": "uint256",
+          "name": "_minVrfBalance",
+          "type": "uint256"
+        }
+      ],
+      "name": "setConfig",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bool",
+          "name": "_paused",
+          "type": "bool"
+        }
+      ],
+      "name": "setPaused",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "stats",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "played",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "won",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "bet",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "winnings",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "ties",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "newOwner",
+          "type": "address"
+        }
+      ],
+      "name": "transferOwnership",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "vrfRequestToGameId",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "withdraw",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "stateMutability": "payable",
+      "type": "receive"
+    }
+  ]
+    </script>
+  <script>
+    const ABI = JSON.parse(document.getElementById('abiScript').textContent);
+
+    // Config
+    const CONTRACT_ADDRESS = "0xF6Fe198eCeC3f2dc24f99bC5EFC898344EFfF99F";
+    const AVALANCHE_RPC = "https://api.avax.network/ext/bc/C/rpc";
+
+    let provider, signer, contract;
+    let userAddress = null;
+
+    const connectBtn = document.getElementById('connectBtn');
+    const walletAddressDiv = document.getElementById('walletAddress');
+    const contractInfoDiv = document.getElementById('contractInfo');
+    const contractAddrSpan = document.getElementById('contractAddr');
+    const ownerSpan = document.getElementById('owner');
+    const minBetSpan = document.getElementById('minBet');
+    const getActiveBtn = document.getElementById('getActiveBtn');
+    const activeGamesDiv = document.getElementById('activeGames');
+    const errorMsgDiv = document.getElementById('errorMsg');
+
+    // --- Improved Join Game UX ---
+    async function loadActiveGamesList() {
+      const listDiv = document.getElementById('activeGamesList');
+      listDiv.textContent = 'Loading...';
+      try {
+        const ids = await contract.getActive();
+        // Filter out games created by the current user
+        const games = [];
+        for (let i = 0; i < ids.length; i++) {
+          const [game] = await contract.getGame(ids[i]);
+          if (game.p1.toLowerCase() !== userAddress.toLowerCase() && game.state === 0) { // Waiting
+            games.push({ id: ids[i], game });
+          }
+        }
+        if (!games.length) {
+          listDiv.textContent = 'No joinable games available.';
+          return;
+        }
+        // Build list
+        listDiv.innerHTML = '';
+        games.forEach(({id, game}) => {
+          const div = document.createElement('div');
+          div.style.marginBottom = '0.7em';
+          div.style.padding = '0.5em';
+          div.style.background = '#181c20';
+          div.style.borderRadius = '6px';
+          div.innerHTML = `
+            <b>Game #${id}</b> | Bet: ${fmt(game.bet)} | Type: ${game.paymentType === 0 ? 'ERC20' : 'AVAX'} | P1: ${shortAddr(game.p1)}
+            <button class='btn btn-primary' style='margin-left:1em;' onclick='window.selectJoinGame(${id},${game.paymentType})'>Join</button>
+          `;
+          listDiv.appendChild(div);
+        });
+      } catch (e) {
+        listDiv.textContent = 'Failed to load games: ' + e.message;
+      }
+    }
+    // Expose for inline onclick
+    window.selectJoinGame = function(gameId, paymentType) {
+      showJoinGameDetails(gameId, paymentType);
+    };
+    async function showJoinGameDetails(gameId, paymentType) {
+      const detailsDiv = document.getElementById('joinGameDetails');
+      detailsDiv.style.display = '';
+      detailsDiv.innerHTML = 'Loading game details...';
+      try {
+        const [game] = await contract.getGame(gameId);
+        let html = `<b>Game #${gameId}</b><br>Bet: ${fmt(game.bet)}<br>Type: ${paymentType === 0 ? 'ERC20' : 'AVAX'}<br>P1: ${shortAddr(game.p1)}`;
+        html += `<br>Choice: <select id='joinChoiceSelect'><option value='1'>Rock</option><option value='2'>Paper</option><option value='3'>Scissors</option></select>`;
+        if (paymentType === 0) {
+          html += ` <button class='btn btn-primary' id='joinErc20Btn2'>Join (ERC20)</button>`;
+        } else {
+          html += ` <button class='btn btn-primary' id='joinAvaxBtn2'>Join (AVAX)</button>`;
+        }
+        detailsDiv.innerHTML = html;
+        // Attach join handler
+        if (paymentType === 0) {
+          document.getElementById('joinErc20Btn2').onclick = async () => {
+            try {
+              const choice = document.getElementById('joinChoiceSelect').value;
+              const c = contract.connect(signer);
+              const tx = await c.joinGame(gameId, choice);
+              logEvent('Join ERC20 game tx: ' + tx.hash);
+              await tx.wait();
+              logEvent('Joined ERC20 game!');
+              refreshInfo();
+              pollGameResult(gameId);
+              detailsDiv.style.display = 'none';
+              loadActiveGamesList();
+            } catch (e) { errorMsgDiv.textContent = e.message; logEvent(e.message, 'error'); }
+          };
+        } else {
+          document.getElementById('joinAvaxBtn2').onclick = async () => {
+            try {
+              const choice = document.getElementById('joinChoiceSelect').value;
+              const [game] = await contract.getGame(gameId);
+              const bet = game.bet;
+              const c = contract.connect(signer);
+              const tx = await c.joinGame(gameId, choice, { value: bet });
+              logEvent('Join AVAX game tx: ' + tx.hash);
+              await tx.wait();
+              logEvent('Joined AVAX game!');
+              refreshInfo();
+              pollGameResult(gameId);
+              detailsDiv.style.display = 'none';
+              loadActiveGamesList();
+            } catch (e) { errorMsgDiv.textContent = e.message; logEvent(e.message, 'error'); }
+          };
+        }
+      } catch (e) {
+        detailsDiv.innerHTML = 'Failed to load game: ' + e.message;
+      }
+    }
+    // Call this after connect and after join/cancel
+    async function refreshAll() {
+      refreshInfo();
+      loadActiveGamesList();
+      document.getElementById('joinGameDetails').style.display = 'none';
+    }
+    // On connect, load active games
+    connectBtn.onclick = async () => {
+      errorMsgDiv.textContent = '';
+      if (!window.ethereum) {
+        errorMsgDiv.textContent = 'MetaMask not found!';
+        return;
+      }
+      try {
+        await window.ethereum.request({ method: 'eth_requestAccounts' });
+        provider = new ethers.providers.Web3Provider(window.ethereum, 'any');
+        signer = provider.getSigner();
+        userAddress = await signer.getAddress();
+        walletAddressDiv.textContent = 'Connected: ' + userAddress;
+        walletAddressDiv.style.display = '';
+        document.getElementById('welcomeSection').style.display = 'none';
+        document.getElementById('mainInterface').style.display = '';
+        await setupContract();
+        await loadActiveGamesList();
+      } catch (e) {
+        errorMsgDiv.textContent = 'Wallet connection failed: ' + e.message;
+      }
+    };
+    // After join/cancel, refresh all
+    document.getElementById('cancelBtn').onclick = async () => {
+      try {
+        const gameId = document.getElementById('cancelGameId').value;
+        const c = contract.connect(signer);
+        const tx = await c.cancel(gameId);
+        logEvent('Cancel game tx: ' + tx.hash);
+        await tx.wait();
+        logEvent('Game cancelled!');
+        refreshAll();
+      } catch (e) { errorMsgDiv.textContent = e.message; logEvent(e.message, 'error'); }
+    };
+    // On page load, hide join details
+    document.getElementById('joinGameDetails').style.display = 'none';
+
+    async function setupContract() {
+      try {
+        // Use the user's provider for signing, but also set up a static provider for reads
+        const staticProvider = new ethers.providers.JsonRpcProvider(AVALANCHE_RPC);
+        contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, staticProvider);
+        contractAddrSpan.textContent = CONTRACT_ADDRESS;
+        // Get owner
+        const owner = await contract.owner();
+        ownerSpan.textContent = owner;
+        // Show admin panel if owner
+        if (userAddress && owner.toLowerCase() === userAddress.toLowerCase()) {
+          document.getElementById('adminPanel').style.display = '';
+          await prefillConfigInputs();
+        } else {
+          document.getElementById('adminPanel').style.display = 'none';
+        }
+        // Get min bet
+        const minBet = await contract.minBetAmount();
+        minBetSpan.textContent = ethers.utils.formatEther(minBet) + ' AVAX';
+        contractInfoDiv.style.display = '';
+      } catch (e) {
+        errorMsgDiv.textContent = 'Failed to load contract: ' + e.message;
+      }
+    }
+
+    // Helper: get contract instance (read or write)
+    function getContract(readonly = false) {
+      if (!provider || !contract) throw new Error('Contract not loaded');
+      return readonly ? contract : contract.connect(signer);
+    }
+
+    // Views
+    document.getElementById('getActiveBtn').onclick = async () => {
+      try {
+        const c = getContract(true);
+        const ids = await c.getActive();
+        document.getElementById('activeGames').textContent = ids.length ? ids.join(', ') : 'No active games.';
+        logEvent('Fetched active games.');
+      } catch (e) { errorMsgDiv.textContent = e.message; logEvent(e.message, 'error'); }
+    };
+    document.getElementById('getFinishedBtn').onclick = async () => {
+      try {
+        const c = getContract(true);
+        const count = await c.getFinishedCount();
+        const ids = await c.getFinished(count);
+        document.getElementById('finishedGames').textContent = ids.length ? ids.join(', ') : 'No finished games.';
+        logEvent('Fetched finished games.');
+      } catch (e) { errorMsgDiv.textContent = e.message; logEvent(e.message, 'error'); }
+    };
+    document.getElementById('getStatsBtn').onclick = async () => {
+      try {
+        const c = getContract(true);
+        const stats = await c.getStats(userAddress);
+        // stats: [played, won, bet, winnings, ties]
+        const html = `
+          <b>Games Played:</b> ${stats[0].toString()}<br>
+          <b>Games Won:</b> ${stats[1].toString()}<br>
+          <b>Total Bet:</b> ${ethers.utils.formatEther(stats[2])} AVAX<br>
+          <b>Total Winnings:</b> ${ethers.utils.formatEther(stats[3])} AVAX<br>
+          <b>Ties:</b> ${stats[4].toString()}
+        `;
+        document.getElementById('myStats').innerHTML = html;
+        logEvent('Fetched my stats.');
+      } catch (e) { errorMsgDiv.textContent = e.message; logEvent(e.message, 'error'); }
+    };
+    document.getElementById('getBalancesBtn').onclick = async () => {
+      try {
+        const c = getContract(true);
+        const [token, avax, fees, feesAVAX] = await c.getContractBalances();
+        document.getElementById('contractBalances').textContent = `ERC20: ${fmt(token)}, AVAX: ${fmt(avax)}, Fees: ${fmt(fees)}, FeesAVAX: ${fmt(feesAVAX)}`;
+        logEvent('Fetched contract balances.');
+      } catch (e) { errorMsgDiv.textContent = e.message; logEvent(e.message, 'error'); }
+    };
+
+    // Defensive: check contract before all actions
+    function ensureContractLoaded() {
+      if (!contract || !signer) throw new Error('Please connect your wallet and wait for contract to load.');
+    }
+    // Patch all write actions to use ensureContractLoaded
+    // (already done for most, but add to emergency/withdraw/pause/unpause etc)
+    document.getElementById('withdrawBtn').onclick = async () => {
+      try {
+        ensureContractLoaded();
+        const c = getContract();
+        const tx = await c.withdraw();
+        logEvent('Withdraw tx: ' + tx.hash);
+        await tx.wait();
+        logEvent('Withdrawn!');
+        refreshAll();
+      } catch (e) { errorMsgDiv.textContent = e.message; logEvent(e.message, 'error'); }
+    };
+    document.getElementById('emergencyBtn').onclick = async () => {
+      try {
+        ensureContractLoaded();
+        const c = getContract();
+        const tx = await c.emergency();
+        logEvent('Emergency withdraw tx: ' + tx.hash);
+        await tx.wait();
+        logEvent('Emergency withdraw done!');
+        refreshAll();
+      } catch (e) { errorMsgDiv.textContent = e.message; logEvent(e.message, 'error'); }
+    };
+    document.getElementById('pauseBtn').onclick = async () => {
+      try {
+        ensureContractLoaded();
+        const c = getContract();
+        const tx = await c.pause();
+        logEvent('Pause tx: ' + tx.hash);
+        await tx.wait();
+        logEvent('Contract paused!');
+        refreshAll();
+      } catch (e) { errorMsgDiv.textContent = e.message; logEvent(e.message, 'error'); }
+    };
+    document.getElementById('unpauseBtn').onclick = async () => {
+      try {
+        ensureContractLoaded();
+        const c = getContract();
+        const tx = await c.unpause();
+        logEvent('Unpause tx: ' + tx.hash);
+        await tx.wait();
+        logEvent('Contract unpaused!');
+        refreshAll();
+      } catch (e) { errorMsgDiv.textContent = e.message; logEvent(e.message, 'error'); }
+    };
+    // Defensive: refresh active games after create/cancel
+    document.getElementById('createErc20Btn').onclick = async () => {
+      try {
+        ensureContractLoaded();
+        const bet = ethers.utils.parseEther(document.getElementById('erc20Bet').value);
+        const choice = document.getElementById('erc20Choice').value;
+        const c = getContract();
+        const tx = await c.createGameERC20(bet, choice);
+        logEvent('Create ERC20 game tx: ' + tx.hash);
+        await tx.wait();
+        logEvent('ERC20 game created!');
+        refreshAll();
+      } catch (e) { errorMsgDiv.textContent = e.message; logEvent(e.message, 'error'); }
+    };
+    document.getElementById('createAvaxBtn').onclick = async () => {
+      try {
+        ensureContractLoaded();
+        const bet = ethers.utils.parseEther(document.getElementById('avaxBet').value);
+        const choice = document.getElementById('avaxChoice').value;
+        const c = getContract();
+        const tx = await c.createGameAVAX(choice, { value: bet });
+        logEvent('Create AVAX game tx: ' + tx.hash);
+        await tx.wait();
+        logEvent('AVAX game created!');
+        refreshAll();
+      } catch (e) { errorMsgDiv.textContent = e.message; logEvent(e.message, 'error'); }
+    };
+
+    // Add event logging
+    function logEvent(msg, type = 'info') {
+      const log = document.getElementById('eventLog');
+      const entry = document.createElement('div');
+      entry.style.marginBottom = '0.3em';
+      entry.innerHTML = `<span style='color:${type==="error"?"#f44336":"#8bc34a"}'>[${type.toUpperCase()}]</span> ${msg}`;
+      log.appendChild(entry);
+      log.scrollTop = log.scrollHeight;
+    }
+
+    // Helper: format ether
+    function fmt(val) {
+      return ethers.utils.formatEther(val) + ' AVAX';
+    }
+
+    // Helper: shorten address
+    function shortAddr(addr) {
+      if (!addr) return '';
+      return addr.slice(0, 6) + '...' + addr.slice(-4);
+    }
+
+    // Helper: refresh contract info
+    async function refreshInfo() {
+      try {
+        contractAddrSpan.textContent = CONTRACT_ADDRESS;
+        const [owner, paused, minBet, houseFee, minVrfBalance, callbackGasLimit, requestConfirmations, balances, fees, feesAVAX, gameToken] = await Promise.all([
+          contract.owner(),
+          contract.paused(),
+          contract.minBetAmount(),
+          contract.houseFeePercentage(),
+          contract.minVrfBalance(),
+          contract.callbackGasLimit(),
+          contract.requestConfirmations(),
+          contract.getContractBalances(),
+          contract.fees(),
+          contract.feesAVAX(),
+          contract.gameToken()
+        ]);
+        ownerSpan.textContent = owner;
+        document.getElementById('paused').textContent = paused ? 'Yes' : 'No';
+        minBetSpan.textContent = fmt(minBet);
+        houseFeeSpan.textContent = (Number(houseFee) / 100).toFixed(2) + '%';
+        minVrfBalanceSpan.textContent = fmt(minVrfBalance);
+        document.getElementById('callbackGasLimit').textContent = callbackGasLimit;
+        document.getElementById('requestConfirmations').textContent = requestConfirmations;
+        avaxBalanceSpan.textContent = fmt(balances[1]);
+        erc20BalanceSpan.textContent = fmt(balances[0]);
+        feesSpan.textContent = fmt(balances[2]);
+        feesAVAXSpan.textContent = fmt(balances[3]);
+      } catch (e) {
+        errorMsgDiv.textContent = 'Failed to refresh info: ' + e.message;
+        logEvent('Failed to refresh info: ' + e.message, 'error');
+      }
+    }
+
+    // Map UI elements
+    const houseFeeSpan = document.getElementById('houseFee');
+    const minVrfBalanceSpan = document.getElementById('minVrfBalance');
+    const avaxBalanceSpan = document.getElementById('avaxBalance');
+    const erc20BalanceSpan = document.getElementById('erc20Balance');
+    const feesSpan = document.getElementById('fees');
+    const feesAVAXSpan = document.getElementById('feesAVAX');
+
+    document.getElementById('refreshBtn').onclick = refreshInfo;
+
+    // Helper: Poll for game result after create/join
+    async function pollGameResult(gameId) {
+      let attempts = 0;
+      const maxAttempts = 60; // 2 min
+      const interval = 2000;
+      let lastState = null;
+      logEvent(`Monitoring game #${gameId} for result...`, 'info');
+      const poll = setInterval(async () => {
+        attempts++;
+        try {
+          const [game] = await contract.getGame(gameId);
+          if (!lastState || lastState.state !== game.state) {
+            logEvent(`Game #${gameId} state: ${['Waiting','Joined','Done','Cancelled','Tied'][game.state]}`);
+            lastState = game;
+          }
+          if (game.state === 2 || game.state === 4) { // Done or Tied
+            if (game.state === 2) {
+              logEvent(`Game #${gameId} resolved! Winner: ${game.winner}`,'success');
+            } else {
+              logEvent(`Game #${gameId} ended in a tie.`,'info');
+            }
+            // Show player choices
+            const choiceNames = ['None','Rock','Paper','Scissors'];
+            logEvent(`P1 choice: ${choiceNames[game.p1Choice]}, P2 choice: ${choiceNames[game.p2Choice]}`);
+            clearInterval(poll);
+            refreshInfo();
+          } else if (game.state === 3) { // Cancelled
+            logEvent(`Game #${gameId} was cancelled.`,'warning');
+            clearInterval(poll);
+            refreshInfo();
+          } else if (attempts >= maxAttempts) {
+            logEvent(`Game #${gameId} monitoring timed out.`,'warning');
+            clearInterval(poll);
+          }
+        } catch (e) {
+          logEvent(`Error polling game #${gameId}: ${e.message}`,'error');
+          clearInterval(poll);
+        }
+      }, interval);
+    }
+
+    // After create/join, poll for result
+    async function getLatestActiveGameId() {
+      const ids = await contract.getPlayerActiveGames(userAddress);
+      return ids.length ? ids[ids.length-1] : null;
+    }
+
+    async function prefillConfigInputs() {
+      try {
+        const c = getContract(true);
+        const [
+          gameToken,
+          houseFee,
+          minBet,
+          callbackGasLimit,
+          requestConfirmations,
+          minVrfBalance
+        ] = await Promise.all([
+          c.gameToken(),
+          c.houseFeePercentage(),
+          c.minBetAmount(),
+          c.callbackGasLimit(),
+          c.requestConfirmations(),
+          c.minVrfBalance()
+        ]);
+        document.getElementById('setGameToken').value = gameToken;
+        document.getElementById('setHouseFee').value = houseFee;
+        document.getElementById('setMinBet').value = ethers.utils.formatEther(minBet);
+        document.getElementById('setGas').value = callbackGasLimit;
+        document.getElementById('setConf').value = requestConfirmations;
+        document.getElementById('setVrfBal').value = ethers.utils.formatEther(minVrfBalance);
+      } catch (e) {
+        logEvent('Failed to prefill config inputs: ' + e.message, 'error');
+      }
+    }
+
+    document.getElementById('setConfigBtn').onclick = async () => {
+      try {
+        ensureContractLoaded();
+        const token = document.getElementById('setGameToken').value.trim() || ethers.constants.AddressZero;
+        const fee = document.getElementById('setHouseFee').value.trim();
+        const minBet = document.getElementById('setMinBet').value.trim();
+        const gas = document.getElementById('setGas').value.trim();
+        const conf = document.getElementById('setConf').value.trim();
+        const minVrf = document.getElementById('setVrfBal').value.trim();
+        const feeVal = fee ? Number(fee) : 0;
+        const minBetVal = minBet ? ethers.utils.parseEther(minBet) : 0;
+        const gasVal = gas ? Number(gas) : 0;
+        const confVal = conf ? Number(conf) : 0;
+        const minVrfVal = minVrf ? ethers.utils.parseEther(minVrf) : 0;
+        const c = getContract();
+        const tx = await c.setConfig(token, feeVal, minBetVal, gasVal, confVal, minVrfVal);
+        logEvent('Set config tx: ' + tx.hash);
+        await tx.wait();
+        logEvent('Config updated!');
+        await prefillConfigInputs();
+        refreshAll();
+      } catch (e) { errorMsgDiv.textContent = e.message; logEvent(e.message, 'error'); }
+    };
+  </script>
+</body>
+</html> 
