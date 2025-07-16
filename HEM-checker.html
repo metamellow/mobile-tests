@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Slots House Edge Multiplier Test</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #1a1a1a;
+            color: #00ff00;
+        }
+        .container {
+            background-color: #2a2a2a;
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid #00ff00;
+        }
+        .input-group {
+            margin: 10px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        label {
+            min-width: 150px;
+            font-weight: bold;
+        }
+        input {
+            background-color: #1a1a1a;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+            padding: 5px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+        button {
+            background-color: #00ff00;
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            font-family: 'Courier New', monospace;
+        }
+        button:disabled {
+            background-color: #666;
+            cursor: not-allowed;
+        }
+        .results {
+            margin-top: 20px;
+            white-space: pre-wrap;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+        .progress {
+            margin: 10px 0;
+            color: #ffff00;
+        }
+        .symbol-names {
+            color: #00ffff;
+            font-size: 10px;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Slots House Edge Multiplier Test</h1>
+        <p>Exact replica of Solidity Slots.sol contract for testing HEM impact</p>
+        <p><strong>Option 1 Implementation:</strong> 1 VRF random number per spin, then derive 3 reels per spin using abi.encodePacked()</p>
+        
+        <div class="symbol-names">
+            Symbols: [0:CLSSC, 1:SHADE, 2:DROOL, 3:TATOO, 4:HURTS, 5:KINGS, 6:LASER]
+        </div>
+
+        <div class="input-group">
+            <label>HEM 1 (%):</label>
+            <input type="number" id="hem1" value="80" min="10" max="200">
+        </div>
+        <div class="input-group">
+            <label>HEM 2 (%):</label>
+            <input type="number" id="hem2" value="100" min="10" max="200">
+        </div>
+        <div class="input-group">
+            <label>HEM 3 (%):</label>
+            <input type="number" id="hem3" value="120" min="10" max="200">
+        </div>
+        <div class="input-group">
+            <label>Spins Per Play:</label>
+            <input type="number" id="spinsPerPlay" value="1" min="1" max="10">
+        </div>
+        <div class="input-group">
+            <label>Test Plays:</label>
+            <input type="number" id="testPlays" value="100000" min="1000" max="1000000">
+        </div>
+        
+        <button id="runTest" onclick="runTest()">Run Test</button>
+        <button id="stopTest" onclick="stopTest()" disabled>Stop Test</button>
+        
+        <div class="progress" id="progress"></div>
+        <div class="results" id="results"></div>
+    </div>
+
+    <script>
+        // Global variables
+        let isRunning = false;
+        let shouldStop = false;
+
+        // Exact replica of Solidity contract data
+        const SYMBOL_NAMES = ["CLSSC", "SHADE", "DROOL", "TATOO", "HURTS", "KINGS", "LASER"];
+        
+        // Exact reel odds from Solidity contract (10000 = 100%)
+        const REEL1_ODDS = [3200, 2300, 1400, 1400, 900, 450, 350];
+        const REEL2_ODDS = [3300, 2300, 1800, 900, 900, 450, 350];
+        const REEL3_ODDS = [2800, 2300, 1800, 1400, 900, 450, 350];
+
+        // Payout table - optimized for 15% house edge, 25% win rate, 80% RTP
+        const PAYOUT_TABLE = [
+            // 2.5x - Common (SHADE + CLSSC + COMMON) - reduced frequency
+            {symbols: [1,0,2], payout: 25000}, // SHADE-CLSSC-DROOL
+            {symbols: [1,0,3], payout: 25000}, // SHADE-CLSSC-TATOO
+            {symbols: [1,0,4], payout: 25000}, // SHADE-CLSSC-HURTS
+            {symbols: [0,1,2], payout: 25000}, // CLSSC-SHADE-DROOL
+            {symbols: [0,1,3], payout: 25000}, // CLSSC-SHADE-TATOO
+            {symbols: [0,1,4], payout: 25000}, // CLSSC-SHADE-HURTS
+            {symbols: [2,1,0], payout: 25000}, // DROOL-SHADE-CLSSC
+            {symbols: [3,1,0], payout: 25000}, // TATOO-SHADE-CLSSC
+            {symbols: [4,1,0], payout: 25000}, // HURTS-SHADE-CLSSC
+            {symbols: [2,0,1], payout: 25000}, // DROOL-CLSSC-SHADE
+            {symbols: [3,0,1], payout: 25000}, // TATOO-CLSSC-SHADE
+            {symbols: [4,0,1], payout: 25000}, // HURTS-CLSSC-SHADE
+            {symbols: [1,2,0], payout: 25000}, // SHADE-DROOL-CLSSC
+            {symbols: [1,3,0], payout: 25000}, // SHADE-TATOO-CLSSC
+            {symbols: [1,4,0], payout: 25000}, // SHADE-HURTS-CLSSC
+            {symbols: [0,2,1], payout: 25000}, // CLSSC-DROOL-SHADE
+            {symbols: [0,3,1], payout: 25000}, // CLSSC-TATOO-SHADE
+            {symbols: [0,4,1], payout: 25000}, // CLSSC-HURTS-SHADE
+
+            // 3x - Common (Triple CLSSC)
+            {symbols: [0,0,0], payout: 30000}, // Triple CLSSC
+
+            // 4x - Uncommon (DROOL/TATOO/HURTS pairs)
+            {symbols: [2,2,3], payout: 40000}, // DROOL-DROOL-TATOO
+            {symbols: [2,2,4], payout: 40000}, // DROOL-DROOL-HURTS
+            {symbols: [3,3,2], payout: 40000}, // TATOO-TATOO-DROOL
+            {symbols: [3,3,4], payout: 40000}, // TATOO-TATOO-HURTS
+            {symbols: [4,4,2], payout: 40000}, // HURTS-HURTS-DROOL
+            {symbols: [4,4,3], payout: 40000}, // HURTS-HURTS-TATOO
+            {symbols: [3,2,2], payout: 40000}, // TATOO-DROOL-DROOL
+            {symbols: [4,2,2], payout: 40000}, // HURTS-DROOL-DROOL
+            {symbols: [2,3,3], payout: 40000}, // DROOL-TATOO-TATOO
+            {symbols: [4,3,3], payout: 40000}, // HURTS-TATOO-TATOO
+            {symbols: [2,4,4], payout: 40000}, // DROOL-HURTS-HURTS
+            {symbols: [3,4,4], payout: 40000}, // TATOO-HURTS-HURTS
+
+            // 8x - Rare (DROOL/TATOO/HURTS with rare)
+            {symbols: [2,2,5], payout: 80000}, // DROOL-DROOL-KINGS
+            {symbols: [2,2,6], payout: 80000}, // DROOL-DROOL-LASER
+            {symbols: [3,3,5], payout: 80000}, // TATOO-TATOO-KINGS
+            {symbols: [3,3,6], payout: 80000}, // TATOO-TATOO-LASER
+            {symbols: [4,4,5], payout: 80000}, // HURTS-HURTS-KINGS
+            {symbols: [4,4,6], payout: 80000}, // HURTS-HURTS-LASER
+            {symbols: [2,5,2], payout: 80000}, // DROOL-KINGS-DROOL
+            {symbols: [2,6,2], payout: 80000}, // DROOL-LASER-DROOL
+            {symbols: [3,5,3], payout: 80000}, // TATOO-KINGS-TATOO
+            {symbols: [3,6,3], payout: 80000}, // TATOO-LASER-TATOO
+            {symbols: [4,5,4], payout: 80000}, // HURTS-KINGS-HURTS
+            {symbols: [4,6,4], payout: 80000}, // HURTS-LASER-HURTS
+            {symbols: [5,2,2], payout: 80000}, // KINGS-DROOL-DROOL
+            {symbols: [6,2,2], payout: 80000}, // LASER-DROOL-DROOL
+            {symbols: [5,3,3], payout: 80000}, // KINGS-TATOO-TATOO
+            {symbols: [6,3,3], payout: 80000}, // LASER-TATOO-TATOO
+            {symbols: [5,4,4], payout: 80000}, // KINGS-HURTS-HURTS
+            {symbols: [6,4,4], payout: 80000}, // LASER-HURTS-HURTS
+
+            // 15x - Very rare (Two KINGS + one common symbol - all positions)
+            {symbols: [5,5,0], payout: 150000}, // KINGS-KINGS-CLSSC
+            {symbols: [5,5,1], payout: 150000}, // KINGS-KINGS-SHADE
+            {symbols: [5,5,2], payout: 150000}, // KINGS-KINGS-DROOL
+            {symbols: [5,5,3], payout: 150000}, // KINGS-KINGS-TATOO
+            {symbols: [5,5,4], payout: 150000}, // KINGS-KINGS-HURTS
+            {symbols: [0,5,5], payout: 150000}, // CLSSC-KINGS-KINGS
+            {symbols: [1,5,5], payout: 150000}, // SHADE-KINGS-KINGS
+            {symbols: [2,5,5], payout: 150000}, // DROOL-KINGS-KINGS
+            {symbols: [3,5,5], payout: 150000}, // TATOO-KINGS-KINGS
+            {symbols: [4,5,5], payout: 150000}, // HURTS-KINGS-KINGS
+            {symbols: [5,0,5], payout: 150000}, // KINGS-CLSSC-KINGS
+            {symbols: [5,1,5], payout: 150000}, // KINGS-SHADE-KINGS
+            {symbols: [5,2,5], payout: 150000}, // KINGS-DROOL-KINGS
+            {symbols: [5,3,5], payout: 150000}, // KINGS-TATOO-KINGS
+            {symbols: [5,4,5], payout: 150000}, // KINGS-HURTS-KINGS
+
+            // 20x - Ultra rare (Two LASER + one common symbol - all positions)
+            {symbols: [6,6,0], payout: 200000}, // LASER-LASER-CLSSC
+            {symbols: [6,6,1], payout: 200000}, // LASER-LASER-SHADE
+            {symbols: [6,6,2], payout: 200000}, // LASER-LASER-DROOL
+            {symbols: [6,6,3], payout: 200000}, // LASER-LASER-TATOO
+            {symbols: [6,6,4], payout: 200000}, // LASER-LASER-HURTS
+            {symbols: [0,6,6], payout: 200000}, // CLSSC-LASER-LASER
+            {symbols: [1,6,6], payout: 200000}, // SHADE-LASER-LASER
+            {symbols: [2,6,6], payout: 200000}, // DROOL-LASER-LASER
+            {symbols: [3,6,6], payout: 200000}, // TATOO-LASER-LASER
+            {symbols: [4,6,6], payout: 200000}, // HURTS-LASER-LASER
+            {symbols: [6,0,6], payout: 200000}, // LASER-CLSSC-LASER
+            {symbols: [6,1,6], payout: 200000}, // LASER-SHADE-LASER
+            {symbols: [6,2,6], payout: 200000}, // LASER-DROOL-LASER
+            {symbols: [6,3,6], payout: 200000}, // LASER-TATOO-LASER
+            {symbols: [6,4,6], payout: 200000}, // LASER-HURTS-LASER
+
+            // 30x - Ultra rare (Triple KINGS/LASER variations)
+            {symbols: [5,5,5], payout: 300000}, // Triple KINGS
+            {symbols: [5,6,5], payout: 300000}, // KINGS-LASER-KINGS
+            {symbols: [6,5,5], payout: 300000}, // LASER-KINGS-KINGS
+            {symbols: [5,5,6], payout: 300000}, // KINGS-KINGS-LASER
+
+            // 50x - Extremely rare (Triple LASER variations)
+            {symbols: [6,5,6], payout: 500000}, // LASER-KINGS-LASER
+            {symbols: [6,6,6], payout: 500000}, // Triple LASER
+        ];
+
+        // Calculate cumulative odds (exact replica of Solidity)
+        function calculateCumulativeOdds(odds) {
+            const cum = [];
+            let sum = 0;
+            for (let i = 0; i < 7; i++) {
+                sum += odds[i];
+                cum.push(sum);
+            }
+            return cum;
+        }
+
+        const REEL1_CUM = calculateCumulativeOdds(REEL1_ODDS);
+        const REEL2_CUM = calculateCumulativeOdds(REEL2_ODDS);
+        const REEL3_CUM = calculateCumulativeOdds(REEL3_ODDS);
+
+        // Exact replica of Solidity _mapToSymbol function
+        function mapToSymbol(r, cumOdds) {
+            if (r >= 10000) throw new Error("Random number out of range");
+            for (let i = 0; i < 7; i++) {
+                if (r < cumOdds[i]) return i;
+            }
+            throw new Error("Invalid random number mapping");
+        }
+
+        // Exact replica of Solidity _lookupPayout function
+        function lookupPayout(s0, s1, s2) {
+            for (let i = 0; i < PAYOUT_TABLE.length; i++) {
+                const combo = PAYOUT_TABLE[i];
+                if (combo.symbols[0] === s0 && combo.symbols[1] === s1 && combo.symbols[2] === s2) {
+                    return combo.payout;
+                }
+            }
+            return 0;
+        }
+
+        // Generate multiple Chainlink-style random numbers
+        function generateChainlinkRandomNumbers(count) {
+            // Generate multiple large random numbers similar to Chainlink VRF
+            const randomNumbers = [];
+            for (let i = 0; i < count; i++) {
+                const randomBytes = new Uint8Array(32);
+                crypto.getRandomValues(randomBytes);
+                randomNumbers.push(ethers.BigNumber.from(randomBytes));
+            }
+            return randomNumbers;
+        }
+
+        // NEW: Option 1 - Request 1 random number per spin, then derive 3 reels per spin
+        function deriveRandomNumbers(vrfRandomNumbers, spinIndex) {
+            // Each spin gets 1 random number from VRF
+            const spinRandom = vrfRandomNumbers[spinIndex];
+            
+            // Derive 3 reel random numbers using abi.encodePacked (like Solidity)
+            const r0 = ethers.utils.keccak256(ethers.utils.solidityPack(
+                ['uint256', 'uint8'], 
+                [spinRandom, 0]
+            ));
+            const r1 = ethers.utils.keccak256(ethers.utils.solidityPack(
+                ['uint256', 'uint8'], 
+                [spinRandom, 1]
+            ));
+            const r2 = ethers.utils.keccak256(ethers.utils.solidityPack(
+                ['uint256', 'uint8'], 
+                [spinRandom, 2]
+            ));
+
+            return [
+                ethers.BigNumber.from(r0).mod(10000).toNumber(),
+                ethers.BigNumber.from(r1).mod(10000).toNumber(),
+                ethers.BigNumber.from(r2).mod(10000).toNumber()
+            ];
+        }
+
+
+
+        // Exact replica of Solidity _getAdjustedCumulativeOdds function
+        function getAdjustedCumulativeOdds(originalCumOdds, hem) {
+            // If HEM is 100%, use original mapping
+            if (hem === 10000) {
+                return [...originalCumOdds];
+            }
+            
+            // Extract individual odds from cumulative odds
+            const individualOdds = [];
+            for (let i = 0; i < 7; i++) {
+                if (i === 0) {
+                    individualOdds.push(originalCumOdds[i]);
+                } else {
+                    individualOdds.push(originalCumOdds[i] - originalCumOdds[i-1]);
+                }
+            }
+            
+            // Calculate bias factor (avoid negative numbers)
+            const bias = hem > 10000 ? hem - 10000 : 10000 - hem;
+            const isPositiveBias = hem > 10000;
+            
+            // Redistribute probability mass
+            const adjustedOdds = [];
+            let total = 0;
+            
+            for (let i = 0; i < 7; i++) {
+                let redistributionFactor;
+                if (i <= 1) {
+                    // Common symbols (0,1): bias affects them one way
+                    redistributionFactor = isPositiveBias ? 10000 + bias : 10000 - bias;
+                } else if (i >= 5) {
+                    // Rare symbols (5,6): bias affects them the opposite way
+                    redistributionFactor = isPositiveBias ? 10000 - bias : 10000 + bias;
+                } else {
+                    // Middle symbols: moderate effect
+                    redistributionFactor = isPositiveBias ? 10000 + (bias / 2) : 10000 - (bias / 2);
+                }
+                
+                // Calculate adjusted value
+                const adjustedValue = Math.floor((individualOdds[i] * redistributionFactor) / 10000);
+                adjustedOdds.push(Math.max(0, adjustedValue));
+                total += adjustedOdds[i];
+            }
+            
+            // Normalize to ensure total is 10000
+            let cumSum = 0;
+            const adjustedCumOdds = [];
+            for (let i = 0; i < 7; i++) {
+                adjustedOdds[i] = Math.floor((adjustedOdds[i] * 10000) / total);
+                cumSum += adjustedOdds[i];
+                adjustedCumOdds.push(cumSum);
+            }
+            
+            // Ensure the last value is exactly 10000
+            adjustedCumOdds[6] = 10000;
+            
+            return adjustedCumOdds;
+        }
+
+        // Calculate effective reel distribution for a given HEM
+        function calculateEffectiveReelDistribution(hem) {
+            const effectiveOdds = [0, 0, 0, 0, 0, 0, 0];
+            const samples = 100000;
+            
+            // Get adjusted cumulative odds for this HEM
+            const adjustedCumOdds = getAdjustedCumulativeOdds(REEL1_CUM, hem);
+
+            for (let i = 0; i < samples; i++) {
+                const r = Math.floor(Math.random() * 10000);
+                const symbol = mapToSymbol(r, adjustedCumOdds);
+                effectiveOdds[symbol]++;
+            }
+
+            // Convert to percentages
+            return effectiveOdds.map(count => Math.round((count / samples) * 10000));
+        }
+
+        // Run a single spin with given HEM
+        function runSingleSpin(vrfRandomNumbers, spinIndex, hem, betPerSpin) {
+            const [r0, r1, r2] = deriveRandomNumbers(vrfRandomNumbers, spinIndex);
+            
+            // Get adjusted cumulative odds for this HEM
+            const adjustedReel1Cum = getAdjustedCumulativeOdds(REEL1_CUM, hem);
+            const adjustedReel2Cum = getAdjustedCumulativeOdds(REEL2_CUM, hem);
+            const adjustedReel3Cum = getAdjustedCumulativeOdds(REEL3_CUM, hem);
+
+            const symbol0 = mapToSymbol(r0, adjustedReel1Cum);
+            const symbol1 = mapToSymbol(r1, adjustedReel2Cum);
+            const symbol2 = mapToSymbol(r2, adjustedReel3Cum);
+
+            const payoutMultiplier = lookupPayout(symbol0, symbol1, symbol2);
+            const multiplier = payoutMultiplier / 10000; // Convert from 10000 = 1x format
+            const actualPayout = (betPerSpin * payoutMultiplier) / 10000; // Actual payout amount
+
+            return {
+                symbols: [symbol0, symbol1, symbol2],
+                payoutMultiplier: payoutMultiplier,
+                multiplier: multiplier,
+                actualPayout: actualPayout,
+                isWin: payoutMultiplier > 0
+            };
+        }
+
+        // Run a complete play (multiple spins with same VRF request) - exact replica of contract
+        function runCompletePlay(vrfRandomNumbers, spinsPerPlay, hem, betPerSpin) {
+            const playResults = [];
+            let totalPlayPayout = 0;
+            let playWins = 0;
+
+            for (let spinIndex = 0; spinIndex < spinsPerPlay; spinIndex++) {
+                const spinResult = runSingleSpin(vrfRandomNumbers, spinIndex, hem, betPerSpin);
+                playResults.push(spinResult);
+                
+                if (spinResult.isWin) {
+                    playWins++;
+                    totalPlayPayout += spinResult.actualPayout; // Use actual payout amount
+                }
+            }
+
+            return {
+                spins: playResults,
+                totalPayout: totalPlayPayout,
+                wins: playWins,
+                isPlayWin: totalPlayPayout > 0
+            };
+        }
+
+        // Run test for a specific HEM
+        async function runTestForHEM(hem, numPlays, spinsPerPlay) {
+            const baseBet = 1; // Base bet amount (like 1 AVAX)
+            const betPerSpin = baseBet; // Contract divides total bet by numSpins
+            const totalBetPerPlay = baseBet * spinsPerPlay; // Total bet per play
+            
+            const results = {
+                totalPlays: numPlays,
+                totalSpins: numPlays * spinsPerPlay,
+                playWins: 0,
+                spinWins: 0,
+                totalPayout: 0,
+                totalBet: numPlays * totalBetPerPlay, // Total bet for all plays
+                symbolCounts: [0, 0, 0, 0, 0, 0, 0],
+                winDistribution: {},
+                playWinDistribution: {} // Track wins per play (0 wins, 1 win, 2 wins, etc.)
+            };
+
+            for (let i = 0; i < numPlays; i++) {
+                if (shouldStop) break;
+
+                // Generate exactly the number of random numbers needed for all spins
+                const randomNumbersNeeded = spinsPerPlay; // 1 random number per spin (not 3)
+                const vrfRandomNumbers = generateChainlinkRandomNumbers(randomNumbersNeeded);
+                const playResult = runCompletePlay(vrfRandomNumbers, spinsPerPlay, hem, betPerSpin);
+
+                // Count symbols from all spins in this play
+                for (const spinResult of playResult.spins) {
+                    results.symbolCounts[spinResult.symbols[0]]++;
+                    results.symbolCounts[spinResult.symbols[1]]++;
+                    results.symbolCounts[spinResult.symbols[2]]++;
+                }
+
+                // Track spin-level wins
+                results.spinWins += playResult.wins;
+                
+                // Track play-level wins
+                if (playResult.isPlayWin) {
+                    results.playWins++;
+                }
+
+                // Track win distribution for individual spins
+                for (const spinResult of playResult.spins) {
+                    if (spinResult.isWin) {
+                        const multiplierKey = spinResult.multiplier + 'x';
+                        results.winDistribution[multiplierKey] = (results.winDistribution[multiplierKey] || 0) + 1;
+                    }
+                }
+
+                // Track play win distribution (how many wins per play)
+                const playWinKey = `${playResult.wins}/${spinsPerPlay}`;
+                results.playWinDistribution[playWinKey] = (results.playWinDistribution[playWinKey] || 0) + 1;
+
+                results.totalPayout += playResult.totalPayout;
+
+                // Update progress every 1000 plays
+                if (i % 1000 === 0) {
+                    document.getElementById('progress').textContent = 
+                        `HEM ${hem/100}%: ${i}/${numPlays} plays completed (${i * spinsPerPlay} spins)`;
+                    await new Promise(resolve => setTimeout(resolve, 0)); // Allow UI update
+                }
+            }
+
+            // Calculate final statistics
+            results.spinWinRate = (results.spinWins / results.totalSpins) * 100;
+            results.playWinRate = (results.playWins / results.totalPlays) * 100;
+            results.avgPayoutPerPlay = results.totalPayout / results.totalPlays;
+            results.avgPayoutPerSpin = results.totalPayout / results.totalSpins;
+            results.houseEdge = ((results.totalBet - results.totalPayout) / results.totalBet) * 100;
+            results.rtp = (results.totalPayout / results.totalBet) * 100;
+            results.poolChange = results.totalBet - results.totalPayout;
+
+            return results;
+        }
+
+        // Main test function
+        async function runTest() {
+            if (isRunning) return;
+
+            isRunning = true;
+            shouldStop = false;
+            document.getElementById('runTest').disabled = true;
+            document.getElementById('stopTest').disabled = false;
+
+            const hem1 = parseInt(document.getElementById('hem1').value) * 100;
+            const hem2 = parseInt(document.getElementById('hem2').value) * 100;
+            const hem3 = parseInt(document.getElementById('hem3').value) * 100;
+            const spinsPerPlay = parseInt(document.getElementById('spinsPerPlay').value);
+            const numPlays = parseInt(document.getElementById('testPlays').value);
+
+            let results = '';
+
+            try {
+                // Calculate effective reel distributions
+                results += '=== EFFECTIVE REEL DISTRIBUTIONS ===\n';
+                results += `Original Reel1: [${REEL1_ODDS.join(', ')}]\n`;
+                results += `Original Reel2: [${REEL2_ODDS.join(', ')}]\n`;
+                results += `Original Reel3: [${REEL3_ODDS.join(', ')}]\n\n`;
+
+                results += `HEM ${hem1/100}% Reel1: [${calculateEffectiveReelDistribution(hem1).join(', ')}]\n`;
+                results += `HEM ${hem2/100}% Reel1: [${calculateEffectiveReelDistribution(hem2).join(', ')}]\n`;
+                results += `HEM ${hem3/100}% Reel1: [${calculateEffectiveReelDistribution(hem3).join(', ')}]\n\n`;
+
+                // Run tests for each HEM
+                const testResults = [];
+
+                for (const hem of [hem1, hem2, hem3]) {
+                    if (shouldStop) break;
+                    
+                    document.getElementById('progress').textContent = 
+                        `Running test for HEM ${hem/100}%...`;
+                    
+                    const result = await runTestForHEM(hem, numPlays, spinsPerPlay);
+                    testResults.push({hem, result});
+                }
+
+                // Display results
+                for (const {hem, result} of testResults) {
+                    results += `=== ${hem/100}% House Edge Multiplier (${hem}) ===\n`;
+                    results += `Total Plays: ${result.totalPlays.toLocaleString()}\n`;
+                    results += `Total Spins: ${result.totalSpins.toLocaleString()}\n`;
+                    results += `Spins Per Play: ${spinsPerPlay}\n`;
+                    results += `Play Wins: ${result.playWins.toLocaleString()}\n`;
+                    results += `Spin Wins: ${result.spinWins.toLocaleString()}\n`;
+                    results += `Play Win Rate: ${result.playWinRate.toFixed(4)}%\n`;
+                    results += `Spin Win Rate: ${result.spinWinRate.toFixed(4)}%\n`;
+                    results += `Avg Payout Per Play: ${result.avgPayoutPerPlay.toFixed(4)}x\n`;
+                    results += `Avg Payout Per Spin: ${result.avgPayoutPerSpin.toFixed(4)}x\n`;
+                    results += `House Edge: ${result.houseEdge.toFixed(4)}%\n`;
+                    results += `RTP: ${result.rtp.toFixed(4)}%\n`;
+                    results += `Total Pool Change: ${result.poolChange.toFixed(4)}\n`;
+                    
+                    // Sort win distribution from lowest to highest multiplier
+                    const sortedWinDistribution = {};
+                    const multipliers = Object.keys(result.winDistribution).map(key => parseFloat(key.replace('x', ''))).sort((a, b) => a - b);
+                    for (const mult of multipliers) {
+                        const key = mult + 'x';
+                        if (result.winDistribution[key]) {
+                            sortedWinDistribution[key] = result.winDistribution[key];
+                        }
+                    }
+                    results += `Spin Win Distribution: ${JSON.stringify(sortedWinDistribution, null, 2)}\n`;
+                    
+                    // Sort play win distribution
+                    const sortedPlayWinDistribution = {};
+                    const playWinKeys = Object.keys(result.playWinDistribution).sort((a, b) => {
+                        const aWins = parseInt(a.split('/')[0]);
+                        const bWins = parseInt(b.split('/')[0]);
+                        return aWins - bWins;
+                    });
+                    for (const key of playWinKeys) {
+                        sortedPlayWinDistribution[key] = result.playWinDistribution[key];
+                    }
+                    results += `Play Win Distribution: ${JSON.stringify(sortedPlayWinDistribution, null, 2)}\n`;
+                    results += `Symbol Distribution: [${result.symbolCounts.map(c => Math.round(c/result.totalSpins/3*10000)).join(', ')}]\n\n`;
+                }
+
+            } catch (error) {
+                results += `Error: ${error.message}\n`;
+            }
+
+            document.getElementById('results').textContent = results;
+            document.getElementById('progress').textContent = 'Test completed!';
+            document.getElementById('runTest').disabled = false;
+            document.getElementById('stopTest').disabled = true;
+            isRunning = false;
+        }
+
+        function stopTest() {
+            shouldStop = true;
+            document.getElementById('progress').textContent = 'Stopping test...';
+        }
+    </script>
+</body>
+</html> 
