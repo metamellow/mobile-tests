@@ -72,8 +72,8 @@
 <body>
     <div class="container">
         <h1>Slots House Edge Multiplier Test</h1>
-        <p>Exact replica of Solidity Slots.sol contract for testing HEM impact</p>
-        <p><strong>Option 1 Implementation:</strong> 1 VRF random number per spin, then derive 3 reels per spin using abi.encodePacked()</p>
+        <p>Replica of Solidity Slots.sol contract for testing HEM impact</p>
+        <p>1 VRF random number per spin, then derive 3 reels per spin using abi.encodePacked()</p>
         
         <div class="symbol-names">
             Symbols: [0:CLSSC, 1:SHADE, 2:DROOL, 3:TATOO, 4:HURTS, 5:KINGS, 6:LASER]
@@ -467,12 +467,10 @@
                     results.playWins++;
                 }
 
-                // Track win distribution for individual spins
+                // Track win distribution for individual spins (including 0x for losses)
                 for (const spinResult of playResult.spins) {
-                    if (spinResult.isWin) {
-                        const multiplierKey = spinResult.multiplier + 'x';
-                        results.winDistribution[multiplierKey] = (results.winDistribution[multiplierKey] || 0) + 1;
-                    }
+                    const multiplierKey = spinResult.isWin ? spinResult.multiplier + 'x' : '0x';
+                    results.winDistribution[multiplierKey] = (results.winDistribution[multiplierKey] || 0) + 1;
                 }
 
                 // Track play win distribution (how many wins per play)
@@ -545,14 +543,9 @@
                 // Display results
                 for (const {hem, result} of testResults) {
                     results += `=== ${hem/100}% House Edge Multiplier (${hem}) ===\n`;
-                    results += `Total Plays: ${result.totalPlays.toLocaleString()}\n`;
                     results += `Total Spins: ${result.totalSpins.toLocaleString()}\n`;
-                    results += `Spins Per Play: ${spinsPerPlay}\n`;
-                    results += `Play Wins: ${result.playWins.toLocaleString()}\n`;
                     results += `Spin Wins: ${result.spinWins.toLocaleString()}\n`;
-                    results += `Play Win Rate: ${result.playWinRate.toFixed(4)}%\n`;
                     results += `Spin Win Rate: ${result.spinWinRate.toFixed(4)}%\n`;
-                    results += `Avg Payout Per Play: ${result.avgPayoutPerPlay.toFixed(4)}x\n`;
                     results += `Avg Payout Per Spin: ${result.avgPayoutPerSpin.toFixed(4)}x\n`;
                     results += `House Edge: ${result.houseEdge.toFixed(4)}%\n`;
                     results += `RTP: ${result.rtp.toFixed(4)}%\n`;
@@ -560,26 +553,17 @@
                     
                     // Sort win distribution from lowest to highest multiplier
                     const sortedWinDistribution = {};
-                    const multipliers = Object.keys(result.winDistribution).map(key => parseFloat(key.replace('x', ''))).sort((a, b) => a - b);
+                    const multipliers = Object.keys(result.winDistribution).map(key => {
+                        if (key === '0x') return 0;
+                        return parseFloat(key.replace('x', ''));
+                    }).sort((a, b) => a - b);
                     for (const mult of multipliers) {
-                        const key = mult + 'x';
+                        const key = mult === 0 ? '0x' : mult + 'x';
                         if (result.winDistribution[key]) {
                             sortedWinDistribution[key] = result.winDistribution[key];
                         }
                     }
                     results += `Spin Win Distribution: ${JSON.stringify(sortedWinDistribution, null, 2)}\n`;
-                    
-                    // Sort play win distribution
-                    const sortedPlayWinDistribution = {};
-                    const playWinKeys = Object.keys(result.playWinDistribution).sort((a, b) => {
-                        const aWins = parseInt(a.split('/')[0]);
-                        const bWins = parseInt(b.split('/')[0]);
-                        return aWins - bWins;
-                    });
-                    for (const key of playWinKeys) {
-                        sortedPlayWinDistribution[key] = result.playWinDistribution[key];
-                    }
-                    results += `Play Win Distribution: ${JSON.stringify(sortedPlayWinDistribution, null, 2)}\n`;
                     results += `Symbol Distribution: [${result.symbolCounts.map(c => Math.round(c/result.totalSpins/3*10000)).join(', ')}]\n\n`;
                 }
 
