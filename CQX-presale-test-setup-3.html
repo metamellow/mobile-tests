@@ -312,9 +312,14 @@
                 btn.innerHTML = '<span class="loading"></span>Connecting...';
                 btn.disabled = true;
 
-                // Request account access
+                // Request account access with timeout
                 console.log('📝 Requesting account access...');
-                const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                const accounts = await Promise.race([
+                    window.ethereum.request({ method: 'eth_requestAccounts' }),
+                    new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error('Connection timeout')), 30000)
+                    )
+                ]);
                 console.log('📋 Received accounts:', accounts.length);
                 
                 if (accounts.length === 0) {
@@ -356,6 +361,8 @@
                     showError('wallet-status', '❌ User rejected the connection request.');
                 } else if (error.code === -32002) {
                     showError('wallet-status', '❌ Connection request already pending. Please check MetaMask.');
+                } else if (error.message.includes('timeout')) {
+                    showError('wallet-status', '❌ Connection timeout. Please try again.');
                 } else {
                     showError('wallet-status', `❌ Failed to connect wallet: ${error.message}`);
                 }

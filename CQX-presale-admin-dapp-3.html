@@ -363,6 +363,7 @@
                     <span id="admin-text">Admin: Not Connected</span>
                 </div>
                 <button class="connect-btn" id="connect-btn">Connect Wallet</button>
+                <button class="connect-btn" id="debug-btn" onclick="debugMetaMask()" style="background: linear-gradient(45deg, #6c757d, #495057); margin-left: 10px;">Debug</button>
             </div>
         </div>
 
@@ -779,11 +780,33 @@
         const networkStatus = document.getElementById('network-status');
         const adminStatus = document.getElementById('admin-status');
 
+        // Debug function to check MetaMask status
+        function debugMetaMask() {
+            console.log('🔍 MetaMask Debug Info:');
+            console.log('- window.ethereum exists:', typeof window.ethereum !== 'undefined');
+            console.log('- window.ethereum.isMetaMask:', window.ethereum?.isMetaMask);
+            console.log('- window.ethereum.isConnected:', window.ethereum?.isConnected?.());
+            console.log('- window.ethereum.selectedAddress:', window.ethereum?.selectedAddress);
+            console.log('- window.ethereum.chainId:', window.ethereum?.chainId);
+            
+            if (window.ethereum) {
+                console.log('- Provider info:', {
+                    isMetaMask: window.ethereum.isMetaMask,
+                    isConnected: window.ethereum.isConnected(),
+                    selectedAddress: window.ethereum.selectedAddress,
+                    chainId: window.ethereum.chainId
+                });
+            }
+        }
+
         // Initialize the application
         async function init() {
             console.log('🚀 Initializing CQX Presale Test Interface...');
             
             try {
+                // Debug MetaMask status
+                debugMetaMask();
+                
                 // Load ABIs
                 await loadABIs();
                 console.log('✅ ABIs loaded');
@@ -815,9 +838,9 @@
                 console.log('📥 Loading contract ABIs...');
                 
                 const [cqxResponse, presaleResponse, usdcResponse] = await Promise.all([
-                    fetch('cqxtoken.json'),
-                    fetch('presaledapp.json'),
-                    fetch('usdctoken.json')
+                    fetch('./cqxtoken.json'),
+                    fetch('./presaledapp.json'),
+                    fetch('./usdctoken.json')
                 ]);
 
                 if (!cqxResponse.ok || !presaleResponse.ok || !usdcResponse.ok) {
@@ -859,9 +882,21 @@
                     throw new Error('MetaMask not found. Please install MetaMask.');
                 }
 
-                // Request account access
-                console.log('📝 Requesting account access...');
-                const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                // Try to get accounts first (might already be connected)
+                console.log('🔍 Checking for existing accounts...');
+                let accounts = await window.ethereum.request({ method: 'eth_accounts' });
+                
+                if (accounts.length === 0) {
+                    // No accounts connected, request access
+                    console.log('📝 Requesting account access...');
+                    accounts = await Promise.race([
+                        window.ethereum.request({ method: 'eth_requestAccounts' }),
+                        new Promise((_, reject) => 
+                            setTimeout(() => reject(new Error('Connection timeout')), 30000)
+                        )
+                    ]);
+                }
+                
                 console.log('📋 Received accounts:', accounts.length);
                 
                 if (accounts.length === 0) {
@@ -906,6 +941,8 @@
                     showError('❌ Connection request already pending. Please check MetaMask.');
                 } else if (error.message.includes('MetaMask not found')) {
                     showError('❌ MetaMask not found. Please install MetaMask extension.');
+                } else if (error.message.includes('timeout')) {
+                    showError('❌ Connection timeout. Please try again.');
                 } else {
                     showError('❌ Failed to connect wallet: ' + error.message);
                 }
@@ -972,9 +1009,17 @@
         // Load presale data
         async function loadPresaleData() {
             try {
-                if (!presaleContract) return;
-                
                 console.log('📊 Loading presale data...');
+                
+                if (!presaleContract) {
+                    console.log('⚠️ No presale contract available, skipping contract calls');
+                    // Update UI with loading state
+                    document.getElementById('presale-active').textContent = 'Not Connected';
+                    document.getElementById('claim-active').textContent = 'Not Connected';
+                    document.getElementById('current-stage').textContent = 'Not Connected';
+                    document.getElementById('total-raised').textContent = 'Not Connected';
+                    return;
+                }
                 
                 const [presaleActive, claimActive, currentStage, totalRaised] = await Promise.all([
                     presaleContract.presaleActive(),
@@ -993,6 +1038,11 @@
                 
             } catch (error) {
                 console.error('❌ Failed to load presale data:', error);
+                // Update UI with error state
+                document.getElementById('presale-active').textContent = 'Error';
+                document.getElementById('claim-active').textContent = 'Error';
+                document.getElementById('current-stage').textContent = 'Error';
+                document.getElementById('total-raised').textContent = 'Error';
             }
         }
 
