@@ -299,6 +299,44 @@
             return true;
         }
 
+        // Switch to Sepolia testnet
+        async function switchToSepolia() {
+            try {
+                const sepoliaConfig = {
+                    chainId: '0xaa36a7', // 11155111 in hex
+                    chainName: 'Sepolia Testnet',
+                    rpcUrls: ['https://sepolia.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161'],
+                    nativeCurrency: {
+                        name: 'Ethereum',
+                        symbol: 'ETH',
+                        decimals: 18
+                    },
+                    blockExplorerUrls: ['https://sepolia.etherscan.io']
+                };
+
+                // Try to switch to Sepolia
+                await window.ethereum.request({
+                    method: 'wallet_switchEthereumChain',
+                    params: [{ chainId: '0xaa36a7' }],
+                });
+                
+                console.log('✅ Switched to Sepolia testnet');
+                
+            } catch (switchError) {
+                // If the chain doesn't exist, add it
+                if (switchError.code === 4902) {
+                    console.log('➕ Adding Sepolia testnet...');
+                    await window.ethereum.request({
+                        method: 'wallet_addEthereumChain',
+                        params: [sepoliaConfig]
+                    });
+                    console.log('✅ Added and switched to Sepolia testnet');
+                } else {
+                    throw switchError;
+                }
+            }
+        }
+
         // Connect wallet
         async function connectWallet() {
             if (!checkMetaMask()) return;
@@ -330,11 +368,18 @@
                 isConnected = true;
                 console.log('👛 Wallet address:', walletAddress);
 
-                // Get current network
+                // Check and switch to Sepolia if needed
                 console.log('🌐 Checking network...');
                 const chainId = await window.ethereum.request({ method: 'eth_chainId' });
-                const networkName = chainId === '0xaa36a7' ? 'Sepolia Testnet' : 'Unknown Network';
-                console.log('🌐 Network:', networkName, 'Chain ID:', chainId);
+                console.log('🌐 Current Chain ID:', chainId);
+                
+                if (chainId !== '0xaa36a7') {
+                    console.log('🔄 Switching to Sepolia testnet...');
+                    await switchToSepolia();
+                }
+                
+                const networkName = 'Sepolia Testnet';
+                console.log('🌐 Network:', networkName);
 
                 // Update UI
                 showSuccess('wallet-status', '✅ Wallet connected successfully!');
