@@ -783,18 +783,30 @@
         async function init() {
             console.log('🚀 Initializing CQX Presale Test Interface...');
             
-            // Load ABIs
-            await loadABIs();
-            
-            // Setup event listeners
-            setupEventListeners();
-            
-            // Check if wallet is already connected
-            if (typeof window.ethereum !== 'undefined') {
-                await checkConnection();
+            try {
+                // Load ABIs
+                await loadABIs();
+                console.log('✅ ABIs loaded');
+                
+                // Setup event listeners
+                setupEventListeners();
+                console.log('✅ Event listeners setup');
+                
+                // Check if wallet is already connected
+                if (typeof window.ethereum !== 'undefined') {
+                    console.log('🔍 MetaMask detected, checking connection...');
+                    await checkConnection();
+                } else {
+                    console.log('⚠️ MetaMask not detected');
+                    // Load presale data even without MetaMask for display
+                    await loadPresaleData();
+                }
+                
+                console.log('✅ Initialization complete');
+            } catch (error) {
+                console.error('❌ Initialization failed:', error);
+                showError('Initialization failed: ' + error.message);
             }
-            
-            console.log('✅ Initialization complete');
         }
 
         // Load contract ABIs
@@ -841,46 +853,62 @@
         // Connect wallet
         async function connectWallet() {
             try {
-                console.log('🔌 Connecting wallet...');
+                console.log('🔌 Starting wallet connection...');
                 
                 if (typeof window.ethereum === 'undefined') {
                     throw new Error('MetaMask not found. Please install MetaMask.');
                 }
 
                 // Request account access
+                console.log('📝 Requesting account access...');
                 const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                console.log('📋 Received accounts:', accounts.length);
                 
                 if (accounts.length === 0) {
                     throw new Error('No accounts found');
                 }
 
                 walletAddress = accounts[0];
-                console.log('👛 Wallet connected:', walletAddress);
+                console.log('👛 Wallet address:', walletAddress);
 
                 // Setup provider and signer
                 provider = new ethers.providers.Web3Provider(window.ethereum);
                 signer = provider.getSigner();
 
                 // Initialize contracts
+                console.log('📋 Initializing contracts...');
                 await initializeContracts();
 
                 // Check network
+                console.log('🌐 Checking network...');
                 await checkNetwork();
 
                 // Check if user is owner
+                console.log('👑 Checking ownership...');
                 await checkOwnership();
 
                 // Update UI
+                console.log('🔄 Updating UI...');
                 updateConnectionStatus(true);
                 
                 // Load presale data
+                console.log('📊 Loading presale data...');
                 await loadPresaleData();
 
                 console.log('✅ Wallet connection complete');
 
             } catch (error) {
                 console.error('❌ Wallet connection failed:', error);
-                showError('Failed to connect wallet: ' + error.message);
+                
+                if (error.code === 4001) {
+                    showError('❌ User rejected the connection request.');
+                } else if (error.code === -32002) {
+                    showError('❌ Connection request already pending. Please check MetaMask.');
+                } else if (error.message.includes('MetaMask not found')) {
+                    showError('❌ MetaMask not found. Please install MetaMask extension.');
+                } else {
+                    showError('❌ Failed to connect wallet: ' + error.message);
+                }
             }
         }
 
@@ -971,8 +999,12 @@
         // Check existing connection
         async function checkConnection() {
             try {
+                console.log('🔍 Checking for existing connection...');
                 const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+                console.log('📋 Found accounts:', accounts.length);
+                
                 if (accounts.length > 0) {
+                    console.log('👛 Connecting to existing account...');
                     walletAddress = accounts[0];
                     provider = new ethers.providers.Web3Provider(window.ethereum);
                     signer = provider.getSigner();
@@ -981,9 +1013,16 @@
                     await checkOwnership();
                     updateConnectionStatus(true);
                     await loadPresaleData();
+                    console.log('✅ Existing connection restored');
+                } else {
+                    console.log('ℹ️ No existing connection found');
+                    // Load presale data even without connection for display
+                    await loadPresaleData();
                 }
             } catch (error) {
                 console.error('❌ Connection check failed:', error);
+                // Load presale data even if connection check fails
+                await loadPresaleData();
             }
         }
 
@@ -1593,6 +1632,11 @@
         // Load analytics data
         async function loadAnalyticsData() {
             try {
+                if (!presaleContract) {
+                    console.log('⚠️ No presale contract available for analytics');
+                    return;
+                }
+                
                 const [totalRaised, totalTokensSold, contributors, currentStage] = await Promise.all([
                     presaleContract.totalRaised(),
                     presaleContract.totalTokensSold(),
@@ -1609,13 +1653,21 @@
                 
             } catch (error) {
                 console.error('❌ Load analytics data failed:', error);
-                showError('Failed to load analytics data: ' + error.message);
+                // Don't show error to user if it's just a connection issue
+                if (error.code !== 'UNSUPPORTED_OPERATION') {
+                    showError('Failed to load analytics data: ' + error.message);
+                }
             }
         }
 
         // Load stage progress
         async function loadStageProgress() {
             try {
+                if (!presaleContract) {
+                    console.log('⚠️ No presale contract available for stage progress');
+                    return;
+                }
+                
                 const [caps, rates] = await presaleContract.getAllPricingStages();
                 const totalSold = await presaleContract.totalTokensSold();
                 
@@ -2112,9 +2164,17 @@
         // Enhanced loadPresaleData function
         async function loadPresaleData() {
             try {
-                if (!presaleContract) return;
-                
                 console.log('📊 Loading presale data...');
+                
+                if (!presaleContract) {
+                    console.log('⚠️ No presale contract available, skipping contract calls');
+                    // Update UI with loading state
+                    document.getElementById('presale-active').textContent = 'Not Connected';
+                    document.getElementById('claim-active').textContent = 'Not Connected';
+                    document.getElementById('current-stage').textContent = 'Not Connected';
+                    document.getElementById('total-raised').textContent = 'Not Connected';
+                    return;
+                }
                 
                 const [presaleActive, claimActive, currentStage, totalRaised] = await Promise.all([
                     presaleContract.presaleActive(),
@@ -2146,7 +2206,10 @@
                 
             } catch (error) {
                 console.error('❌ Failed to load presale data:', error);
-                showError('Failed to load presale data: ' + error.message);
+                // Don't show error to user if it's just a connection issue
+                if (error.code !== 'UNSUPPORTED_OPERATION') {
+                    showError('Failed to load presale data: ' + error.message);
+                }
             }
         }
 

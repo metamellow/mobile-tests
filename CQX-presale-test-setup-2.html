@@ -308,11 +308,14 @@
             const info = document.getElementById('wallet-info');
 
             try {
+                console.log('🔌 Starting wallet connection...');
                 btn.innerHTML = '<span class="loading"></span>Connecting...';
                 btn.disabled = true;
 
                 // Request account access
+                console.log('📝 Requesting account access...');
                 const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                console.log('📋 Received accounts:', accounts.length);
                 
                 if (accounts.length === 0) {
                     throw new Error('No accounts found');
@@ -320,10 +323,13 @@
 
                 walletAddress = accounts[0];
                 isConnected = true;
+                console.log('👛 Wallet address:', walletAddress);
 
                 // Get current network
+                console.log('🌐 Checking network...');
                 const chainId = await window.ethereum.request({ method: 'eth_chainId' });
                 const networkName = chainId === '0xaa36a7' ? 'Sepolia Testnet' : 'Unknown Network';
+                console.log('🌐 Network:', networkName, 'Chain ID:', chainId);
 
                 // Update UI
                 showSuccess('wallet-status', '✅ Wallet connected successfully!');
@@ -339,13 +345,17 @@
                 document.getElementById('add-token-btn').disabled = false;
                 
                 // Refresh balances automatically
+                console.log('💰 Refreshing balances...');
                 await refreshBalances();
+                console.log('✅ Wallet connection complete');
 
             } catch (error) {
-                console.error('Error connecting wallet:', error);
+                console.error('❌ Error connecting wallet:', error);
                 
                 if (error.code === 4001) {
                     showError('wallet-status', '❌ User rejected the connection request.');
+                } else if (error.code === -32002) {
+                    showError('wallet-status', '❌ Connection request already pending. Please check MetaMask.');
                 } else {
                     showError('wallet-status', `❌ Failed to connect wallet: ${error.message}`);
                 }
@@ -449,14 +459,17 @@
         // Refresh balances
         async function refreshBalances() {
             if (!isConnected || !walletAddress) {
+                console.log('⚠️ Cannot refresh balances - wallet not connected');
                 showError('token-status', '❌ Please connect your wallet first.');
                 return;
             }
 
             try {
+                console.log('💰 Refreshing balances for:', walletAddress);
                 showInfo('token-status', '🔄 Refreshing balances...');
                 
                 // Get ETH balance
+                console.log('🔍 Getting ETH balance...');
                 const ethBalance = await window.ethereum.request({
                     method: 'eth_getBalance',
                     params: [walletAddress, 'latest']
@@ -465,8 +478,10 @@
                 // Convert from wei to ETH
                 const ethBalanceFormatted = (parseInt(ethBalance, 16) / 1e18).toFixed(4);
                 document.getElementById('eth-balance').textContent = `${ethBalanceFormatted} ETH`;
+                console.log('💰 ETH balance:', ethBalanceFormatted);
                 
                 // Get USDC balance using ethers.js
+                console.log('🔍 Getting USDC balance...');
                 const provider = new ethers.providers.Web3Provider(window.ethereum);
                 const usdcContract = new ethers.Contract(
                     USDC_TOKEN_CONFIG.address,
@@ -483,11 +498,13 @@
                 const usdcBalance = await usdcContract.balanceOf(walletAddress);
                 const usdcBalanceFormatted = (Number(usdcBalance) / 1e6).toLocaleString();
                 document.getElementById('usdc-balance').textContent = `${usdcBalanceFormatted} USDC`;
+                console.log('💰 USDC balance:', usdcBalanceFormatted);
                 
                 showSuccess('token-status', '✅ Balances refreshed successfully!');
+                console.log('✅ Balance refresh complete');
                 
             } catch (error) {
-                console.error('Error refreshing balances:', error);
+                console.error('❌ Error refreshing balances:', error);
                 showError('token-status', `❌ Failed to refresh balances: ${error.message}`);
             }
         }
@@ -576,13 +593,17 @@
         }
 
         // Check if MetaMask is installed on page load
-        window.addEventListener('load', function() {
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 Initializing MetaMask Setup...');
+            
             if (typeof window.ethereum === 'undefined') {
+                console.log('⚠️ MetaMask not detected');
                 showError('wallet-status', '⚠️ MetaMask is not installed. Please install MetaMask first.');
                 document.getElementById('connect-wallet-btn').disabled = true;
                 document.getElementById('add-network-btn').disabled = true;
                 document.getElementById('add-token-btn').disabled = true;
             } else {
+                console.log('✅ MetaMask detected');
                 showInfo('wallet-status', '✅ MetaMask detected. Click "Connect MetaMask Wallet" to get started!');
                 // Check if already connected
                 checkExistingConnection();
@@ -592,8 +613,12 @@
         // Check for existing connection
         async function checkExistingConnection() {
             try {
+                console.log('🔍 Checking for existing connection...');
                 const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+                console.log('📋 Found accounts:', accounts.length);
+                
                 if (accounts.length > 0) {
+                    console.log('👛 Restoring existing connection...');
                     walletAddress = accounts[0];
                     isConnected = true;
                     
@@ -614,9 +639,13 @@
                     
                     // Refresh balances automatically
                     await refreshBalances();
+                    console.log('✅ Existing connection restored');
+                } else {
+                    console.log('ℹ️ No existing connection found');
                 }
             } catch (error) {
-                console.error('Error checking existing connection:', error);
+                console.error('❌ Error checking existing connection:', error);
+                showError('wallet-status', '❌ Failed to check existing connection: ' + error.message);
             }
         }
 
