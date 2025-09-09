@@ -754,7 +754,7 @@
     </div>
 
     <!-- Scripts -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.15.0/ethers.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
     <script>
         // Global variables
         let provider, signer, walletAddress;
@@ -858,8 +858,8 @@
                 console.log('👛 Wallet connected:', walletAddress);
 
                 // Setup provider and signer
-                provider = new ethers.BrowserProvider(window.ethereum);
-                signer = await provider.getSigner();
+                provider = new ethers.providers.Web3Provider(window.ethereum);
+                signer = provider.getSigner();
 
                 // Initialize contracts
                 await initializeContracts();
@@ -910,7 +910,7 @@
                 console.log('🌐 Network detected:', network.name, 'Chain ID:', chainId);
                 
                 // Check if it's Sepolia
-                if (chainId !== 11155111n) {
+                if (chainId !== 11155111) {
                     throw new Error('Please connect to Sepolia testnet (Chain ID: 11155111)');
                 }
                 
@@ -974,8 +974,8 @@
                 const accounts = await window.ethereum.request({ method: 'eth_accounts' });
                 if (accounts.length > 0) {
                     walletAddress = accounts[0];
-                    provider = new ethers.BrowserProvider(window.ethereum);
-                    signer = await provider.getSigner();
+                    provider = new ethers.providers.Web3Provider(window.ethereum);
+                    signer = provider.getSigner();
                     await initializeContracts();
                     await checkNetwork();
                     await checkOwnership();
@@ -1061,7 +1061,7 @@
         // Format USDC amount
         function formatUSDC(amount) {
             if (!amount) return '0 USDC';
-            return `${(Number(amount) / 1e6).toLocaleString()} USDC`;
+            return `${ethers.utils.formatUnits(amount, 6)} USDC`;
         }
 
         // Show error message
@@ -1314,7 +1314,7 @@
                 }
                 
                 // Convert amount to proper format (18 decimals for tokens)
-                const amountWei = BigInt(amount) * BigInt(1e18);
+                const amountWei = ethers.utils.parseEther(amount);
                 
                 const tx = await presaleContract.emergencyRecoverTokens(tokenAddress, amountWei);
                 await tx.wait();
@@ -1349,11 +1349,11 @@
                 }
                 
                 // Convert tokens to 18 decimals (as expected by contract)
-                const tokensWei = BigInt(tokens) * BigInt(1e18);
+                const tokensWei = ethers.utils.parseEther(tokens);
                 
                 // Convert price to contract format (price * 1,000,000)
                 // e.g., $0.05 becomes 50,000, $0.10 becomes 100,000
-                const priceWei = BigInt(Math.floor(Number(price) * 1000000));
+                const priceWei = ethers.utils.parseUnits(price.toString(), 6);
                 
                 const tx = await presaleContract.updatePricingStage(stageIndex, tokensWei, priceWei);
                 await tx.wait();
@@ -1495,7 +1495,7 @@
         // Mint test USDC
         async function mintTestUSDC() {
             try {
-                const amount = BigInt(10000) * BigInt(1e6); // 10,000 USDC
+                const amount = ethers.utils.parseUnits("10000", 6); // 10,000 USDC
                 const tx = await usdcToken.mint(walletAddress, amount);
                 await tx.wait();
                 
@@ -1524,13 +1524,7 @@
                     return;
                 }
                 
-                const amountWei = BigInt(amount) * BigInt(1e6); // Convert to USDC decimals
-                
-                // Additional validation for BigInt conversion
-                if (amountWei > BigInt("18446744073709551615")) { // Max safe BigInt
-                    showError('Amount too large for approval. Please use a smaller amount.');
-                    return;
-                }
+                const amountWei = ethers.utils.parseUnits(amount, 6); // Convert to USDC decimals
                 
                 const tx = await usdcToken.approve(CONTRACT_ADDRESSES.PRESALE_CONTRACT, amountWei);
                 await tx.wait();
@@ -1561,13 +1555,7 @@
                     return;
                 }
                 
-                const amountWei = BigInt(amount) * BigInt(1e6); // Convert to USDC decimals
-                
-                // Additional validation for BigInt conversion
-                if (amountWei > BigInt("18446744073709551615")) { // Max safe BigInt
-                    showError('Amount too large for reservation. Please use a smaller amount.');
-                    return;
-                }
+                const amountWei = ethers.utils.parseUnits(amount, 6); // Convert to USDC decimals
                 
                 const tx = await presaleContract.reserve(amountWei);
                 await tx.wait();
@@ -1631,7 +1619,7 @@
                 const [caps, rates] = await presaleContract.getAllPricingStages();
                 const totalSold = await presaleContract.totalTokensSold();
                 
-                let tokensSoldInPreviousStages = BigInt(0);
+                let tokensSoldInPreviousStages = ethers.BigNumber.from(0);
                 
                 for (let i = 0; i < 5; i++) {
                     const stageCap = caps[i];
@@ -1641,8 +1629,8 @@
                     const progressFill = document.getElementById(`stage-${i + 1}-progress-fill`);
                     
                     if (i === 0) {
-                        const tokensSoldInStage = totalSold > stageCap ? stageCap : totalSold;
-                        const progressPercent = Number((tokensSoldInStage * BigInt(100)) / stageCap);
+                        const tokensSoldInStage = totalSold.gt(stageCap) ? stageCap : totalSold;
+                        const progressPercent = tokensSoldInStage.mul(100).div(stageCap).toNumber();
                         
                         stageProgress.textContent = `${formatTokens(tokensSoldInStage)} / ${formatTokens(stageCap)} (${progressPercent}%) @ $${stagePrice.toFixed(2)}`;
                         progressFill.style.width = `${Math.min(progressPercent, 100)}%`;
@@ -1650,14 +1638,14 @@
                         tokensSoldInPreviousStages = stageCap;
                     } else {
                         const stageStart = tokensSoldInPreviousStages;
-                        const stageEnd = stageStart + stageCap;
+                        const stageEnd = stageStart.add(stageCap);
                         
-                        let tokensSoldInStage = BigInt(0);
-                        if (totalSold > stageStart) {
-                            tokensSoldInStage = totalSold > stageEnd ? stageCap : totalSold - stageStart;
+                        let tokensSoldInStage = ethers.BigNumber.from(0);
+                        if (totalSold.gt(stageStart)) {
+                            tokensSoldInStage = totalSold.gt(stageEnd) ? stageCap : totalSold.sub(stageStart);
                         }
                         
-                        const progressPercent = Number((tokensSoldInStage * BigInt(100)) / stageCap);
+                        const progressPercent = tokensSoldInStage.mul(100).div(stageCap).toNumber();
                         
                         stageProgress.textContent = `${formatTokens(tokensSoldInStage)} / ${formatTokens(stageCap)} (${progressPercent}%) @ $${stagePrice.toFixed(2)}`;
                         progressFill.style.width = `${Math.min(progressPercent, 100)}%`;
@@ -1683,13 +1671,13 @@
                 }
                 
                 // Use exact same value that worked on Remix
-                const amountWei = BigInt(100000000); // 100 USDC in 6-decimal format
+                const amountWei = ethers.utils.parseUnits("100", 6); // 100 USDC in 6-decimal format
                 console.log('Amount in wei:', amountWei.toString());
                 
                 const tokens = await presaleContract.calculateTokens(amountWei);
                 console.log('Tokens returned:', tokens.toString());
                 
-                const tokensNum = Number(tokens) / 1e18;
+                const tokensNum = parseFloat(ethers.utils.formatEther(tokens));
                 console.log('Tokens as CQX:', tokensNum);
                 
                 showSuccess(`Hardcoded test successful: 100 USDC = ${tokensNum.toFixed(0)} CQX`);
@@ -1712,7 +1700,7 @@
                     return;
                 }
                 
-                console.log('Contract address:', presaleContract.target);
+                console.log('Contract address:', presaleContract.address);
                 console.log('Contract ABI loaded:', !!presaleAbi);
                 
                 // Test a simple view function
@@ -1749,7 +1737,7 @@
                 }
                 
                 // Validate contract address
-                if (!presaleContract.target) {
+                if (!presaleContract.address) {
                     showError('Invalid contract address. Please reconnect wallet.');
                     return;
                 }
@@ -1768,21 +1756,14 @@
                 }
                 
                 // Convert USDC amount to 6-decimal format (as expected by contract)
-                const amountWei = BigInt(amount) * BigInt(1e6);
+                const amountWei = ethers.utils.parseUnits(amount, 6);
                 
                 // Debug logging
                 console.log('🔍 Debug Info:');
                 console.log('Input amount:', amount);
                 console.log('Amount as number:', amountNum);
-                console.log('Amount in wei (BigInt):', amountWei.toString());
-                console.log('BigInt type check:', typeof amountWei);
-                console.log('Contract address:', presaleContract.target);
-                
-                // Additional validation for BigInt conversion
-                if (amountWei > BigInt("18446744073709551615")) { // Max safe BigInt
-                    showError('Amount too large for calculation. Please use a smaller amount.');
-                    return;
-                }
+                console.log('Amount in wei:', amountWei.toString());
+                console.log('Contract address:', presaleContract.address);
                 
                 // Call contract with explicit error handling
                 console.log('📞 Calling contract...');
@@ -1798,7 +1779,7 @@
                 const currentPrice = Number(rates[currentStageNum - 1]) / 1000000; // Convert from price * 1,000,000 to actual price
                 
                 // Calculate expected tokens manually for verification
-                const expectedTokens = (Number(amount) * 1e18) / currentPrice;
+                const expectedTokens = ethers.utils.parseEther((Number(amount) / currentPrice).toString());
                 
                 // Calculate simple division for comparison
                 const simpleTokens = Number(amount) / currentPrice;
@@ -1807,7 +1788,7 @@
                     `${amount} USDC = ${formatTokens(tokens)} CQX\n` +
                     `Current Price: $${currentPrice.toFixed(2)} per CQX\n` +
                     `Simple Math: ${amount} ÷ $${currentPrice.toFixed(2)} = ${simpleTokens.toFixed(2)} CQX\n` +
-                    `Expected (1e18): ${formatTokens(BigInt(Math.floor(expectedTokens)))} CQX\n` +
+                    `Expected (1e18): ${formatTokens(ethers.utils.parseEther(Math.floor(expectedTokens).toString()))} CQX\n` +
                     `Contract Result: ${formatTokens(tokens)} CQX`;
                 
             } catch (error) {
@@ -1894,20 +1875,14 @@
                 const tokens = (Number(amount) / currentPrice);
                 
                 // Calculate using contract function for comparison
-                const amountWei = BigInt(amount) * BigInt(1e6);
-                
-                // Additional validation for BigInt conversion
-                if (amountWei > BigInt("18446744073709551615")) { // Max safe BigInt
-                    showError('Amount too large for calculation. Please use a smaller amount.');
-                    return;
-                }
+                const amountWei = ethers.utils.parseUnits(amount, 6);
                 
                 const contractTokens = await presaleContract.calculateTokens(amountWei);
-                const contractTokensNum = Number(contractTokens) / 1e18;
+                const contractTokensNum = parseFloat(ethers.utils.formatEther(contractTokens));
                 
                 // Calculate expected tokens more accurately
-                const expectedTokens = (Number(amount) * 1e18) / currentPrice;
-                const expectedTokensNum = Number(expectedTokens) / 1e18;
+                const expectedTokens = ethers.utils.parseEther((Number(amount) / currentPrice).toString());
+                const expectedTokensNum = parseFloat(ethers.utils.formatEther(expectedTokens));
                 
                 const calculation = `
                     Manual Calculation:
@@ -1952,13 +1927,13 @@
                 
                 // Calculate average price (avoid division by zero)
                 let averagePrice = 'N/A';
-                if (totalSold > 0) {
+                if (totalSold.gt(0)) {
                     // Calculate average price: total raised / total tokens sold
                     // totalRaised is in USDC (6 decimals), totalSold is in CQX (18 decimals)
                     // We want price per CQX in USD, so: (totalRaised * 1e18) / totalSold
-                    const avgPriceWei = (BigInt(totalRaised) * BigInt(1e18)) / totalSold;
+                    const avgPriceWei = totalRaised.mul(ethers.utils.parseEther("1")).div(totalSold);
                     // Convert from wei to USD (divide by 1e6 for USDC decimals)
-                    averagePrice = `$${(Number(avgPriceWei) / 1e6).toFixed(4)} per CQX`;
+                    averagePrice = `$${parseFloat(ethers.utils.formatUnits(avgPriceWei, 6)).toFixed(4)} per CQX`;
                 }
                 
                 const results = `
@@ -1999,8 +1974,8 @@
                 
                 userData.forEach((contribution, index) => {
                     const address = contributors[index];
-                    const amountPaid = Number(contribution.amountPaid) / 1e6; // USDC has 6 decimals
-                    const tokensReserved = Number(contribution.tokensReserved) / 1e18; // CQX has 18 decimals
+                    const amountPaid = parseFloat(ethers.utils.formatUnits(contribution.amountPaid, 6)); // USDC has 6 decimals
+                    const tokensReserved = parseFloat(ethers.utils.formatEther(contribution.tokensReserved)); // CQX has 18 decimals
                     const timestamp = new Date(Number(contribution.timestamp) * 1000).toISOString();
                     
                     csv += `${address},${amountPaid},${tokensReserved},${contribution.paymentToken},${timestamp},${contribution.hasClaimed}\n`;
@@ -2072,7 +2047,7 @@
         // Format token amounts
         function formatTokens(amount) {
             if (!amount) return '0 CQX';
-            return `${(Number(amount) / 1e18).toLocaleString()} CQX`;
+            return `${ethers.utils.formatEther(amount)} CQX`;
         }
 
         // Load admin data
@@ -2102,7 +2077,7 @@
                 const [caps, rates] = await presaleContract.getAllPricingStages();
                 for (let i = 0; i < 5; i++) {
                     const stageInfo = document.getElementById(`stage-${i + 1}-info`);
-                    const tokens = Number(caps[i]) / 1e18;
+                    const tokens = parseFloat(ethers.utils.formatEther(caps[i]));
                     const price = Number(rates[i]) / 1000000; // Convert from price * 1,000,000 to actual price
                     stageInfo.textContent = `${tokens.toLocaleString()} tokens @ $${price.toFixed(2)}`;
                 }
