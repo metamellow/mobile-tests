@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CQX Presale Setup</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #333;
+        }
+
+        .container {
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            max-width: 500px;
+            width: 90%;
+        }
+
+        .logo {
+            font-size: 3em;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+            font-size: 2.2em;
+            font-weight: 700;
+        }
+
+        .subtitle {
+            color: #6c757d;
+            margin-bottom: 40px;
+            font-size: 1.1em;
+        }
+
+        .step {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            border: 1px solid #e9ecef;
+        }
+
+        .step h3 {
+            color: #495057;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+
+        .step p {
+            color: #6c757d;
+            margin-bottom: 20px;
+            font-size: 0.95em;
+            line-height: 1.5;
+        }
+
+        .btn {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-success {
+            background: linear-gradient(45deg, #28a745, #20c997);
+        }
+
+        .status {
+            margin-top: 15px;
+            padding: 12px;
+            border-radius: 8px;
+            font-weight: 500;
+            display: none;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .network-info {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            text-align: left;
+        }
+
+        .network-info div {
+            margin-bottom: 5px;
+        }
+
+        .network-info strong {
+            color: #495057;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .balance {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+
+        .balance div {
+            margin-bottom: 5px;
+        }
+
+        .balance strong {
+            color: #495057;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">🦊</div>
+        <h1>CQX Presale Setup</h1>
+        <p class="subtitle">Connect to Sepolia Testnet and get test tokens</p>
+
+        <!-- Step 1: Connect Wallet -->
+        <div class="step">
+            <h3>1. Connect Wallet</h3>
+            <p>Connect your MetaMask wallet to get started.</p>
+            <button class="btn" id="connect-btn" onclick="connectWallet()">
+                Connect MetaMask
+            </button>
+            <div class="status" id="connect-status"></div>
+            <div class="network-info hidden" id="wallet-info">
+                <div><strong>Address:</strong> <span id="wallet-address">-</span></div>
+                <div><strong>Network:</strong> <span id="current-network">-</span></div>
+            </div>
+        </div>
+
+        <!-- Step 2: Switch to Sepolia -->
+        <div class="step">
+            <h3>2. Switch to Sepolia Testnet</h3>
+            <p>We'll automatically switch you to Sepolia testnet.</p>
+            <button class="btn" id="network-btn" onclick="switchToSepolia()" disabled>
+                Switch to Sepolia
+            </button>
+            <div class="status" id="network-status"></div>
+        </div>
+
+        <!-- Step 3: Get Test Tokens -->
+        <div class="step">
+            <h3>3. Get Test USDC</h3>
+            <p>Mint test USDC tokens for testing the presale.</p>
+            <button class="btn" id="mint-btn" onclick="mintUSDC()" disabled>
+                Mint 10,000 USDC
+            </button>
+            <div class="status" id="mint-status"></div>
+            <div class="balance hidden" id="balance-info">
+                <div><strong>ETH Balance:</strong> <span id="eth-balance">-</span></div>
+                <div><strong>USDC Balance:</strong> <span id="usdc-balance">-</span></div>
+            </div>
+        </div>
+
+
+        <div class="status info" id="help-status">
+            <strong>Need Sepolia ETH?</strong> Get free testnet ETH from <a href="https://sepolia-faucet.pk910.de/" target="_blank" style="color: #0c5460;">Sepolia Faucet</a>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
+    <script>
+        // Contract addresses
+        const USDC_ADDRESS = '0xFCC1636239C021326140063b0D864EC7f65Be941';
+        const SEPOLIA_CHAIN_ID = '0xaa36a7'; // 11155111
+
+        // Global state
+        let walletAddress = null;
+        let isConnected = false;
+        let isOnSepolia = false;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 CQX Presale Setup initialized');
+            checkExistingConnection();
+        });
+
+        // Check if already connected
+        async function checkExistingConnection() {
+            if (typeof window.ethereum === 'undefined') {
+                showError('connect-status', 'MetaMask not found. Please install MetaMask first.');
+                return;
+            }
+
+            try {
+                const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+                if (accounts.length > 0) {
+                    walletAddress = accounts[0];
+                    isConnected = true;
+                    updateWalletInfo();
+                    await checkNetwork();
+                }
+            } catch (error) {
+                console.error('Error checking connection:', error);
+            }
+        }
+
+        // Connect wallet
+        async function connectWallet() {
+            if (typeof window.ethereum === 'undefined') {
+                showError('connect-status', 'MetaMask not found. Please install MetaMask first.');
+                return;
+            }
+
+            const btn = document.getElementById('connect-btn');
+            const status = document.getElementById('connect-status');
+
+            try {
+                btn.innerHTML = '<span class="loading"></span>Connecting...';
+                btn.disabled = true;
+
+                const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                
+                if (accounts.length === 0) {
+                    throw new Error('No accounts found');
+                }
+
+                walletAddress = accounts[0];
+                isConnected = true;
+                updateWalletInfo();
+                await checkNetwork();
+
+                showSuccess('connect-status', '✅ Wallet connected successfully!');
+                btn.textContent = 'Connected ✓';
+                btn.className = 'btn btn-success';
+                document.getElementById('network-btn').disabled = false;
+
+            } catch (error) {
+                console.error('Connection error:', error);
+                
+                if (error.code === 4001) {
+                    showError('connect-status', '❌ Connection rejected by user.');
+                } else {
+                    showError('connect-status', `❌ Connection failed: ${error.message}`);
+                }
+                
+                btn.innerHTML = 'Connect MetaMask';
+                btn.disabled = false;
+            }
+        }
+
+        // Update wallet info display
+        function updateWalletInfo() {
+            if (walletAddress) {
+                document.getElementById('wallet-address').textContent = 
+                    `${walletAddress.substring(0, 6)}...${walletAddress.substring(38)}`;
+                document.getElementById('wallet-info').classList.remove('hidden');
+            }
+        }
+
+        // Check current network
+        async function checkNetwork() {
+            try {
+                const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+                const networkName = chainId === SEPOLIA_CHAIN_ID ? 'Sepolia Testnet' : 'Other Network';
+                
+                document.getElementById('current-network').textContent = networkName;
+                
+                if (chainId === SEPOLIA_CHAIN_ID) {
+                    isOnSepolia = true;
+                    document.getElementById('network-btn').textContent = 'On Sepolia ✓';
+                    document.getElementById('network-btn').className = 'btn btn-success';
+                document.getElementById('mint-btn').disabled = false;
+                    await refreshBalances();
+                } else {
+                    isOnSepolia = false;
+                    document.getElementById('network-btn').textContent = 'Switch to Sepolia';
+                    document.getElementById('network-btn').className = 'btn';
+                }
+            } catch (error) {
+                console.error('Network check error:', error);
+            }
+        }
+
+        // Switch to Sepolia
+        async function switchToSepolia() {
+            const btn = document.getElementById('network-btn');
+            const status = document.getElementById('network-status');
+
+            try {
+                btn.innerHTML = '<span class="loading"></span>Switching...';
+                btn.disabled = true;
+
+                const sepoliaConfig = {
+                    chainId: SEPOLIA_CHAIN_ID,
+                    chainName: 'Sepolia Testnet',
+                    rpcUrls: ['https://sepolia.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161'],
+                    nativeCurrency: {
+                        name: 'Ethereum',
+                        symbol: 'ETH',
+                        decimals: 18
+                    },
+                    blockExplorerUrls: ['https://sepolia.etherscan.io']
+                };
+
+                try {
+                    // Try to switch
+                    await window.ethereum.request({
+                        method: 'wallet_switchEthereumChain',
+                        params: [{ chainId: SEPOLIA_CHAIN_ID }],
+                    });
+                } catch (switchError) {
+                    // If chain doesn't exist, add it
+                    if (switchError.code === 4902) {
+                        await window.ethereum.request({
+                            method: 'wallet_addEthereumChain',
+                            params: [sepoliaConfig]
+                        });
+                    } else {
+                        throw switchError;
+                    }
+                }
+
+                showSuccess('network-status', '✅ Switched to Sepolia testnet!');
+                btn.textContent = 'On Sepolia ✓';
+                btn.className = 'btn btn-success';
+                isOnSepolia = true;
+                document.getElementById('mint-btn').disabled = false;
+                await refreshBalances();
+
+            } catch (error) {
+                console.error('Network switch error:', error);
+                showError('network-status', `❌ Failed to switch network: ${error.message}`);
+                btn.innerHTML = 'Switch to Sepolia';
+                btn.disabled = false;
+            }
+        }
+
+        // Mint USDC
+        async function mintUSDC() {
+            if (!isConnected || !isOnSepolia) {
+                showError('mint-status', '❌ Please connect wallet and switch to Sepolia first.');
+                return;
+            }
+
+            const btn = document.getElementById('mint-btn');
+            const status = document.getElementById('mint-status');
+
+            try {
+                btn.innerHTML = '<span class="loading"></span>Minting...';
+                btn.disabled = true;
+
+                // Check ETH balance first
+                const ethBalance = await window.ethereum.request({
+                    method: 'eth_getBalance',
+                    params: [walletAddress, 'latest']
+                });
+
+                const ethBalanceFormatted = (parseInt(ethBalance, 16) / 1e18);
+                if (ethBalanceFormatted < 0.001) {
+                    throw new Error('Insufficient ETH balance. Please get Sepolia ETH from the faucet first.');
+                }
+
+                // Mint USDC
+                const mintABI = [{
+                    "inputs": [
+                        {"internalType": "address", "name": "to", "type": "address"},
+                        {"internalType": "uint256", "name": "amount", "type": "uint256"}
+                    ],
+                    "name": "mint",
+                    "outputs": [],
+                    "stateMutability": "nonpayable",
+                    "type": "function"
+                }];
+
+                const provider = new ethers.providers.Web3Provider(window.ethereum);
+                const signer = provider.getSigner();
+                const usdcContract = new ethers.Contract(USDC_ADDRESS, mintABI, signer);
+
+                const amount = ethers.utils.parseUnits("10000", 6); // 10,000 USDC
+                const tx = await usdcContract.mint(walletAddress, amount);
+                await tx.wait();
+
+                showSuccess('mint-status', '✅ Successfully minted 10,000 USDC!');
+                btn.textContent = 'Minted ✓';
+                btn.className = 'btn btn-success';
+                await refreshBalances();
+
+            } catch (error) {
+                console.error('Mint error:', error);
+                
+                if (error.message.includes('Insufficient ETH')) {
+                    showError('mint-status', `❌ ${error.message}`);
+                } else if (error.code === 4001) {
+                    showError('mint-status', '❌ Transaction rejected by user.');
+                } else {
+                    showError('mint-status', `❌ Mint failed: ${error.message}`);
+                }
+                
+                btn.innerHTML = 'Mint 10,000 USDC';
+                btn.disabled = false;
+            }
+        }
+
+        // Refresh balances
+        async function refreshBalances() {
+            if (!isConnected || !isOnSepolia) return;
+
+            try {
+                // ETH balance
+                const ethBalance = await window.ethereum.request({
+                    method: 'eth_getBalance',
+                    params: [walletAddress, 'latest']
+                });
+                const ethBalanceFormatted = (parseInt(ethBalance, 16) / 1e18).toFixed(4);
+                document.getElementById('eth-balance').textContent = `${ethBalanceFormatted} ETH`;
+
+                // USDC balance
+                const provider = new ethers.providers.Web3Provider(window.ethereum);
+                const usdcContract = new ethers.Contract(
+                    USDC_ADDRESS,
+                    [{
+                        "inputs": [{"internalType": "address", "name": "account", "type": "address"}],
+                        "name": "balanceOf",
+                        "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+                        "stateMutability": "view",
+                        "type": "function"
+                    }],
+                    provider
+                );
+                
+                const usdcBalance = await usdcContract.balanceOf(walletAddress);
+                const usdcBalanceFormatted = (Number(usdcBalance) / 1e6).toLocaleString();
+                document.getElementById('usdc-balance').textContent = `${usdcBalanceFormatted} USDC`;
+
+                document.getElementById('balance-info').classList.remove('hidden');
+
+            } catch (error) {
+                console.error('Balance refresh error:', error);
+            }
+        }
+
+
+        // Utility functions
+        function showSuccess(elementId, message) {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = 'status success';
+            element.style.display = 'block';
+        }
+
+        function showError(elementId, message) {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = 'status error';
+            element.style.display = 'block';
+        }
+
+        function showInfo(elementId, message) {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = 'status info';
+            element.style.display = 'block';
+        }
+
+        // Listen for network changes
+        if (typeof window.ethereum !== 'undefined') {
+            window.ethereum.on('chainChanged', (chainId) => {
+                if (chainId === SEPOLIA_CHAIN_ID) {
+                    isOnSepolia = true;
+                    checkNetwork();
+                } else {
+                    isOnSepolia = false;
+                    checkNetwork();
+                }
+            });
+
+            window.ethereum.on('accountsChanged', (accounts) => {
+                if (accounts.length === 0) {
+                    // Disconnected
+                    walletAddress = null;
+                    isConnected = false;
+                    isOnSepolia = false;
+                    location.reload();
+                } else {
+                    // Account changed
+                    walletAddress = accounts[0];
+                    isConnected = true;
+                    updateWalletInfo();
+                    checkNetwork();
+                }
+            });
+        }
+    </script>
+</body>
+</html>
