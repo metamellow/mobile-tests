@@ -26,6 +26,11 @@
 	},
 	{
 		"inputs": [],
+		"name": "ClaimNotActive",
+		"type": "error"
+	},
+	{
+		"inputs": [],
 		"name": "ExceedsMaxContribution",
 		"type": "error"
 	},
@@ -96,6 +101,25 @@
 		"anonymous": false,
 		"inputs": [
 			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "minContribution",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "maxContribution",
+				"type": "uint256"
+			}
+		],
+		"name": "ContributionLimitsUpdated",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
 				"indexed": true,
 				"internalType": "address",
 				"name": "previousOwner",
@@ -109,6 +133,63 @@
 			}
 		],
 		"name": "OwnershipTransferred",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "newWallet",
+				"type": "address"
+			}
+		],
+		"name": "PaymentWalletUpdated",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "stageIndex",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "tokensForSale",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "priceUSD",
+				"type": "uint256"
+			}
+		],
+		"name": "PricingStageUpdated",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "usdcToken",
+				"type": "address"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "cqxToken",
+				"type": "address"
+			}
+		],
+		"name": "TokenAddressesUpdated",
 		"type": "event"
 	},
 	{

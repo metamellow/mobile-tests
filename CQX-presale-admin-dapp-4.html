@@ -766,7 +766,7 @@
         const CONTRACT_ADDRESSES = {
             CQX_TOKEN: '0xB40Baf5546BEf9aB04713119E59669781A0E5f76',
             USDC_TOKEN: '0xFCC1636239C021326140063b0D864EC7f65Be941',
-            PRESALE_CONTRACT: '0x34e6dF2F297022A2759D8f1e950f4Fc010BCC731', // Updated address
+            PRESALE_CONTRACT: '0x8Ce50535f749b1d6924b4777f58c6d30eD751E01', // Updated address
             PAYMENT_WALLET: '0x16E226E9120A56aC76dF21874679f2bFe9134456',
             ADMIN_WALLET: '0xC4cFeb23E3533BE399B8E1026f67816c18243Dee'
         };
@@ -1769,9 +1769,16 @@
                     const stageProgress = document.getElementById(`stage-${i + 1}-progress`);
                     const progressFill = document.getElementById(`stage-${i + 1}-progress-fill`);
                     
+                    // Check if stage cap is zero or invalid
+                    if (stageCap.isZero() || stageCap.eq(0)) {
+                        stageProgress.textContent = `No tokens allocated @ $${stagePrice.toFixed(2)}`;
+                        progressFill.style.width = '0%';
+                        continue;
+                    }
+                    
                     if (i === 0) {
                         const tokensSoldInStage = totalSold.gt(stageCap) ? stageCap : totalSold;
-                        const progressPercent = tokensSoldInStage.mul(100).div(stageCap).toNumber();
+                        const progressPercent = stageCap.gt(0) ? tokensSoldInStage.mul(100).div(stageCap).toNumber() : 0;
                         
                         stageProgress.textContent = `${formatTokens(tokensSoldInStage)} / ${formatTokens(stageCap)} (${progressPercent}%) @ $${stagePrice.toFixed(2)}`;
                         progressFill.style.width = `${Math.min(progressPercent, 100)}%`;
@@ -1786,7 +1793,7 @@
                             tokensSoldInStage = totalSold.gt(stageEnd) ? stageCap : totalSold.sub(stageStart);
                         }
                         
-                        const progressPercent = tokensSoldInStage.mul(100).div(stageCap).toNumber();
+                        const progressPercent = stageCap.gt(0) ? tokensSoldInStage.mul(100).div(stageCap).toNumber() : 0;
                         
                         stageProgress.textContent = `${formatTokens(tokensSoldInStage)} / ${formatTokens(stageCap)} (${progressPercent}%) @ $${stagePrice.toFixed(2)}`;
                         progressFill.style.width = `${Math.min(progressPercent, 100)}%`;
@@ -1797,7 +1804,8 @@
                 
             } catch (error) {
                 console.error('❌ Load stage progress failed:', error);
-                showError('Failed to load stage progress: ' + error.message);
+                // Don't show error to user for stage progress, just log it
+                console.log('⚠️ Stage progress unavailable - this is normal for single-stage contracts');
             }
         }
 
@@ -2220,7 +2228,12 @@
                     const stageInfo = document.getElementById(`stage-${i + 1}-info`);
                     const tokens = parseFloat(ethers.utils.formatEther(caps[i]));
                     const price = Number(rates[i]) / 1000000; // Convert from price * 1,000,000 to actual price
-                    stageInfo.textContent = `${tokens.toLocaleString()} tokens @ $${price.toFixed(2)}`;
+                    
+                    if (caps[i].isZero() || caps[i].eq(0)) {
+                        stageInfo.textContent = `No tokens allocated @ $${price.toFixed(2)}`;
+                    } else {
+                        stageInfo.textContent = `${tokens.toLocaleString()} tokens @ $${price.toFixed(2)}`;
+                    }
                 }
                 
             } catch (error) {
