@@ -257,26 +257,23 @@
             <p>Administrative interface for managing the casino ecosystem</p>
         </div>
 
-        <!-- Status Bar -->
-        <div class="status-bar">
-            <div class="wallet-info">
-                <span id="wallet-status">Not Connected</span>
-                <span id="wallet-address" class="hidden"></span>
-            </div>
-            <button class="btn" id="connect-btn" onclick="connectWallet()">Connect Wallet</button>
-        </div>
-
         <!-- Loading Indicator -->
         <div class="loading" id="loading">
             <div class="spinner"></div>
             <p>Loading...</p>
         </div>
 
-        <!-- Main Content (hidden until wallet connected) -->
-        <div id="main-content" class="hidden">
+        <!-- Main Content -->
+        <div id="main-content">
             <!-- Statistics Section -->
             <div class="section" id="stats-section">
                 <h2>📊 Statistics</h2>
+                <!-- Content will be added by JavaScript -->
+            </div>
+
+            <!-- Contract Data Dump Section -->
+            <div class="section" id="contract-data-section">
+                <h2>📋 Contract Configuration & Data</h2>
                 <!-- Content will be added by JavaScript -->
             </div>
 
@@ -286,15 +283,30 @@
                 <!-- Content will be added by JavaScript -->
             </div>
 
+            <!-- Staking Data Section -->
+            <div class="section" id="staking-section">
+                <h2>🪙 Staking Data</h2>
+                <!-- Content will be added by JavaScript -->
+            </div>
+
+            <!-- Status Bar (for admin functions) -->
+            <div class="status-bar">
+                <div class="wallet-info">
+                    <span id="wallet-status">Not Connected</span>
+                    <span id="wallet-address" class="hidden"></span>
+                </div>
+                <button class="btn" id="connect-btn" onclick="connectWallet()">Connect Wallet</button>
+            </div>
+
             <!-- Admin Functions Section -->
             <div class="section" id="admin-section">
                 <h2>⚙️ Admin Functions</h2>
                 <!-- Content will be added by JavaScript -->
             </div>
 
-            <!-- Staking Data Section -->
-            <div class="section" id="staking-section">
-                <h2>🪙 Staking Data</h2>
+            <!-- Slots Management Section -->
+            <div class="section" id="slots-section">
+                <h2>🎰 Slots Management</h2>
                 <!-- Content will be added by JavaScript -->
             </div>
         </div>
@@ -362,7 +374,7 @@
                 contracts.Slots = new ethers.Contract(CONFIG.CONTRACT_ADDRESSES.Slots, abis.Slots, readOnlyProvider);
                 
                 // Show main content immediately (for read-only viewing)
-                document.getElementById('main-content').classList.remove('hidden');
+                // No longer hiding main-content since it's always visible now
                 
                 // Initialize sections (read-only mode)
                 await initAllSections();
@@ -456,9 +468,11 @@
         async function initAllSections() {
             try {
                 await initStatsSection();
+                await initContractDataSection();
+                await initStakingSection();
                 await initPointsSection();
                 await initAdminSection();
-                await initStakingSection();
+                await initSlotsSection();
             } catch (error) {
                 console.error('❌ Section initialization failed:', error);
                 showError('Failed to initialize sections: ' + error.message);
@@ -574,10 +588,245 @@
                 CONFIG.STARTING_POOL_AMOUNTS.ETH = startingEthInput;
                 CONFIG.STARTING_POOL_AMOUNTS.wTENX = startingWTENXInput;
 
+                // Refresh staking overview in stats section
+                await refreshStaking();
+                
                 showResult('stats-result', 'success', 'Statistics refreshed successfully!');
             } catch (error) {
                 console.error('❌ Failed to refresh stats:', error);
                 showResult('stats-result', 'error', 'Error: ' + error.message);
+            }
+        }
+
+        /* ================= CONTRACT DATA DUMP SECTION ================= */
+        async function initContractDataSection() {
+            const section = document.getElementById('contract-data-section');
+            section.innerHTML = `
+                <div class="two-column">
+                    <div>
+                        <h3>🏠 House Contract</h3>
+                        <button class="btn btn-info" onclick="dumpHouseData()">🔄 Refresh House Data</button>
+                        <div id="house-data-dump" class="result-display info" style="margin-top: 15px; white-space: pre-wrap; font-size: 11px; max-height: 500px; overflow-y: auto;"></div>
+                    </div>
+                    <div>
+                        <h3>🎰 Slots Contract</h3>
+                        <button class="btn btn-info" onclick="dumpSlotsData()">🔄 Refresh Slots Data</button>
+                        <div id="slots-data-dump" class="result-display info" style="margin-top: 15px; white-space: pre-wrap; font-size: 11px; max-height: 500px; overflow-y: auto;"></div>
+                    </div>
+                </div>
+            `;
+            // Load data on initialization
+            await dumpHouseData();
+            await dumpSlotsData();
+        }
+
+        async function dumpHouseData() {
+            try {
+                const dumpEl = document.getElementById('house-data-dump');
+                dumpEl.textContent = 'Loading House contract data...';
+                
+                // Basic info
+                const owner = await contracts.House.owner();
+                const devWallet = await contracts.House.devWallet();
+                const spinToken = await contracts.House.spinToken();
+                const hardPaused = await contracts.House.hardPaused();
+                const softPaused = await contracts.House.softPaused();
+                
+                // Staking config
+                const minStake = await contracts.House.minStake();
+                const maxStake = await contracts.House.maxStake();
+                const minWithdraw = await contracts.House.minWithdraw();
+                const maxWithdraw = await contracts.House.maxWithdraw();
+                const exitFeeBps = await contracts.House.exitFeeBps();
+                const lockTime = await contracts.House.lockTime();
+                const totalStaked = await contracts.House.totalStaked();
+                
+                // Token addresses
+                const ethAddress = ethers.ZeroAddress;
+                const wtenxAddress = CONFIG.CONTRACT_ADDRESSES.wTENX;
+                
+                // ETH config
+                const ethPlayerPool = await contracts.House.playerPools(ethAddress);
+                const ethStakerPool = await contracts.House.stakerPools(ethAddress);
+                const ethDevFees = await contracts.House.devFeesCollected(ethAddress);
+                const ethFeeBps = await contracts.House.feeBps(ethAddress);
+                const ethStakerPercentBps = await contracts.House.stakerPoolPercentBps(ethAddress);
+                const ethMinBet = await contracts.House.minBet(ethAddress);
+                const ethMaxPayoutBps = await contracts.House.maxPayoutPercentBps(ethAddress);
+                const ethPendingBets = await contracts.House.pendingBets(ethAddress);
+                const ethWhitelisted = await contracts.House.whitelistedTokens(ethAddress);
+                const ethDecimals = ethWhitelisted ? await contracts.House.tokenDecimals(ethAddress) : 18;
+                
+                // wTENX config
+                const wtenxPlayerPool = await contracts.House.playerPools(wtenxAddress);
+                const wtenxStakerPool = await contracts.House.stakerPools(wtenxAddress);
+                const wtenxDevFees = await contracts.House.devFeesCollected(wtenxAddress);
+                const wtenxFeeBps = await contracts.House.feeBps(wtenxAddress);
+                const wtenxStakerPercentBps = await contracts.House.stakerPoolPercentBps(wtenxAddress);
+                const wtenxMinBet = await contracts.House.minBet(wtenxAddress);
+                const wtenxMaxPayoutBps = await contracts.House.maxPayoutPercentBps(wtenxAddress);
+                const wtenxPendingBets = await contracts.House.pendingBets(wtenxAddress);
+                const wtenxWhitelisted = await contracts.House.whitelistedTokens(wtenxAddress);
+                const wtenxDecimals = await contracts.House.tokenDecimals(wtenxAddress);
+                
+                // Game authorizations
+                const plinkoAuth = await contracts.House.isAuthorizedGame(CONFIG.CONTRACT_ADDRESSES.Plinko);
+                const rouletteAuth = await contracts.House.isAuthorizedGame(CONFIG.CONTRACT_ADDRESSES.Roulette);
+                const slotsAuth = await contracts.House.isAuthorizedGame(CONFIG.CONTRACT_ADDRESSES.Slots);
+                
+                // Build dump text
+                let dump = `🏠 HOUSE CONTRACT DATA DUMP\n`;
+                dump += `═══════════════════════════════════════════════════════════\n\n`;
+                dump += `📌 BASIC INFO\n`;
+                dump += `   Owner: ${owner}\n`;
+                dump += `   Dev Wallet: ${devWallet}\n`;
+                dump += `   Staking Token: ${spinToken}\n`;
+                dump += `   Hard Paused: ${hardPaused}\n`;
+                dump += `   Soft Paused: ${softPaused}\n\n`;
+                
+                dump += `⚙️ STAKING CONFIGURATION\n`;
+                dump += `   Min Stake: ${formatEther5(minStake)}\n`;
+                dump += `   Max Stake: ${maxStake.toString() === '0' ? 'No limit' : formatEther5(maxStake)}\n`;
+                dump += `   Min Withdraw: ${formatEther5(minWithdraw)}\n`;
+                dump += `   Max Withdraw: ${maxWithdraw.toString() === '0' ? 'No limit' : formatEther5(maxWithdraw)}\n`;
+                dump += `   Exit Fee: ${Number(exitFeeBps) / 100}% (${exitFeeBps} bps)\n`;
+                dump += `   Lock Time: ${lockTime.toString() === '0' ? 'No lock' : lockTime.toString() + ' seconds'}\n`;
+                dump += `   Total Staked: ${formatEther5(totalStaked)}\n\n`;
+                
+                dump += `💰 ETH CONFIGURATION\n`;
+                dump += `   Whitelisted: ${ethWhitelisted}\n`;
+                dump += `   Decimals: ${ethDecimals}\n`;
+                dump += `   Player Pool: ${formatEther5(ethPlayerPool)} ETH\n`;
+                dump += `   Staker Pool: ${formatEther5(ethStakerPool)} ETH\n`;
+                dump += `   Dev Fees Collected: ${formatEther5(ethDevFees)} ETH\n`;
+                dump += `   Fee: ${Number(ethFeeBps) / 100}% (${ethFeeBps} bps)\n`;
+                dump += `   Staker %: ${Number(ethStakerPercentBps) / 100}% (${ethStakerPercentBps} bps)\n`;
+                dump += `   Min Bet: ${formatEther5(ethMinBet)} ETH\n`;
+                dump += `   Max Payout: ${Number(ethMaxPayoutBps) / 100}% (${ethMaxPayoutBps} bps)\n`;
+                dump += `   Pending Bets: ${formatEther5(ethPendingBets)} ETH\n\n`;
+                
+                dump += `🪙 wTENX CONFIGURATION\n`;
+                dump += `   Token Address: ${wtenxAddress}\n`;
+                dump += `   Whitelisted: ${wtenxWhitelisted}\n`;
+                dump += `   Decimals: ${wtenxDecimals}\n`;
+                dump += `   Player Pool: ${formatEther5(wtenxPlayerPool)} wTENX\n`;
+                dump += `   Staker Pool: ${formatEther5(wtenxStakerPool)} wTENX\n`;
+                dump += `   Dev Fees Collected: ${formatEther5(wtenxDevFees)} wTENX\n`;
+                dump += `   Fee: ${Number(wtenxFeeBps) / 100}% (${wtenxFeeBps} bps)\n`;
+                dump += `   Staker %: ${Number(wtenxStakerPercentBps) / 100}% (${wtenxStakerPercentBps} bps)\n`;
+                dump += `   Min Bet: ${formatEther5(wtenxMinBet)} wTENX\n`;
+                dump += `   Max Payout: ${Number(wtenxMaxPayoutBps) / 100}% (${wtenxMaxPayoutBps} bps)\n`;
+                dump += `   Pending Bets: ${formatEther5(wtenxPendingBets)} wTENX\n\n`;
+                
+                dump += `🎮 GAME AUTHORIZATIONS\n`;
+                dump += `   Plinko (${CONFIG.CONTRACT_ADDRESSES.Plinko}): ${plinkoAuth ? '✅ AUTHORIZED' : '❌ NOT AUTHORIZED'}\n`;
+                dump += `   Roulette (${CONFIG.CONTRACT_ADDRESSES.Roulette}): ${rouletteAuth ? '✅ AUTHORIZED' : '❌ NOT AUTHORIZED'}\n`;
+                dump += `   Slots (${CONFIG.CONTRACT_ADDRESSES.Slots}): ${slotsAuth ? '✅ AUTHORIZED' : '❌ NOT AUTHORIZED'}\n`;
+                
+                dumpEl.textContent = dump;
+            } catch (error) {
+                console.error('❌ Failed to dump House data:', error);
+                document.getElementById('house-data-dump').textContent = 'Error loading House data: ' + error.message;
+            }
+        }
+
+        async function dumpSlotsData() {
+            try {
+                const dumpEl = document.getElementById('slots-data-dump');
+                dumpEl.textContent = 'Loading Slots contract data...';
+                
+                // Basic info
+                const owner = await contracts.Slots.owner();
+                const house = await contracts.Slots.house();
+                const hem = await contracts.Slots.houseEdgeMultiplier();
+                const nextGameId = await contracts.Slots.nextGameId();
+                
+                // Symbol names (fetch by index)
+                const symbolNames = [];
+                for (let i = 0; i < 7; i++) {
+                    symbolNames.push(await contracts.Slots.symbolNames(i));
+                }
+                
+                // Reel odds (fetch by index)
+                const reel1Odds = [];
+                const reel2Odds = [];
+                const reel3Odds = [];
+                for (let i = 0; i < 7; i++) {
+                    reel1Odds.push(await contracts.Slots.reel1Odds(i));
+                    reel2Odds.push(await contracts.Slots.reel2Odds(i));
+                    reel3Odds.push(await contracts.Slots.reel3Odds(i));
+                }
+                
+                // Cumulative odds (fetch by index)
+                const reel1Cum = [];
+                const reel2Cum = [];
+                const reel3Cum = [];
+                for (let i = 0; i < 7; i++) {
+                    reel1Cum.push(await contracts.Slots.reel1Cum(i));
+                    reel2Cum.push(await contracts.Slots.reel2Cum(i));
+                    reel3Cum.push(await contracts.Slots.reel3Cum(i));
+                }
+                
+                // Build dump text
+                let dump = `🎰 SLOTS CONTRACT DATA DUMP\n`;
+                dump += `═══════════════════════════════════════════════════════════\n\n`;
+                dump += `📌 BASIC INFO\n`;
+                dump += `   Owner: ${owner}\n`;
+                dump += `   House Address: ${house}\n`;
+                dump += `   House Edge Multiplier (HEM): ${Number(hem)} (${Number(hem) / 100}%)\n`;
+                dump += `   Next Game ID: ${(nextGameId - 1n).toString()} games played\n\n`;
+                
+                dump += `🎨 SYMBOL NAMES\n`;
+                for (let i = 0; i < 7; i++) {
+                    dump += `   [${i}]: ${symbolNames[i]}\n`;
+                }
+                dump += `\n`;
+                
+                dump += `🎲 REEL 1 ODDS (per symbol, out of 10000 = 100%)\n`;
+                for (let i = 0; i < 7; i++) {
+                    const odds = Number(reel1Odds[i]);
+                    dump += `   [${i}] ${symbolNames[i]}: ${odds / 100}% (${odds} bps)\n`;
+                }
+                dump += `\n`;
+                
+                dump += `🎲 REEL 2 ODDS (per symbol, out of 10000 = 100%)\n`;
+                for (let i = 0; i < 7; i++) {
+                    const odds = Number(reel2Odds[i]);
+                    dump += `   [${i}] ${symbolNames[i]}: ${odds / 100}% (${odds} bps)\n`;
+                }
+                dump += `\n`;
+                
+                dump += `🎲 REEL 3 ODDS (per symbol, out of 10000 = 100%)\n`;
+                for (let i = 0; i < 7; i++) {
+                    const odds = Number(reel3Odds[i]);
+                    dump += `   [${i}] ${symbolNames[i]}: ${odds / 100}% (${odds} bps)\n`;
+                }
+                dump += `\n`;
+                
+                dump += `📊 REEL 1 CUMULATIVE ODDS\n`;
+                for (let i = 0; i < 7; i++) {
+                    const cum = Number(reel1Cum[i]);
+                    dump += `   [${i}] ${symbolNames[i]}: ${cum / 100}% (${cum} bps)\n`;
+                }
+                dump += `\n`;
+                
+                dump += `📊 REEL 2 CUMULATIVE ODDS\n`;
+                for (let i = 0; i < 7; i++) {
+                    const cum = Number(reel2Cum[i]);
+                    dump += `   [${i}] ${symbolNames[i]}: ${cum / 100}% (${cum} bps)\n`;
+                }
+                dump += `\n`;
+                
+                dump += `📊 REEL 3 CUMULATIVE ODDS\n`;
+                for (let i = 0; i < 7; i++) {
+                    const cum = Number(reel3Cum[i]);
+                    dump += `   [${i}] ${symbolNames[i]}: ${cum / 100}% (${cum} bps)\n`;
+                }
+                
+                dumpEl.textContent = dump;
+            } catch (error) {
+                console.error('❌ Failed to dump Slots data:', error);
+                document.getElementById('slots-data-dump').textContent = 'Error loading Slots data: ' + error.message;
             }
         }
 
@@ -1027,9 +1276,6 @@
         async function initStakingSection() {
             const section = document.getElementById('staking-section');
             section.innerHTML = `
-                <h3>📊 Staking Overview</h3>
-                <div class="stats-grid" id="staking-overview"></div>
-                
                 <h3>👤 User Staking Data</h3>
                 <div class="input-group">
                     <label>Wallet Address</label>
@@ -1050,24 +1296,28 @@
                 const minStake = await contracts.House.minStake();
                 const maxStake = await contracts.House.maxStake();
                 
-                document.getElementById('staking-overview').innerHTML = `
-                    <div class="stat-card">
-                        <h4>Total Staked</h4>
-                        <div class="value">${formatEther5(totalStaked)}</div>
-                    </div>
-                    <div class="stat-card">
-                        <h4>Staking Token</h4>
-                        <div class="value" style="font-size: 0.9rem; word-break: break-all;">${stakingToken}</div>
-                    </div>
-                    <div class="stat-card">
-                        <h4>Min Stake</h4>
-                        <div class="value">${formatEther5(minStake)}</div>
-                    </div>
-                    <div class="stat-card">
-                        <h4>Max Stake</h4>
-                        <div class="value">${maxStake.toString() === '0' ? 'No limit' : formatEther5(maxStake)}</div>
-                    </div>
-                `;
+                // Update staking overview in stats section
+                const stakingOverviewEl = document.getElementById('staking-overview');
+                if (stakingOverviewEl) {
+                    stakingOverviewEl.innerHTML = `
+                        <div class="stat-card">
+                            <h4>Total Staked</h4>
+                            <div class="value">${formatEther5(totalStaked)}</div>
+                        </div>
+                        <div class="stat-card">
+                            <h4>Staking Token</h4>
+                            <div class="value" style="font-size: 0.9rem; word-break: break-all;">${stakingToken}</div>
+                        </div>
+                        <div class="stat-card">
+                            <h4>Min Stake</h4>
+                            <div class="value">${formatEther5(minStake)}</div>
+                        </div>
+                        <div class="stat-card">
+                            <h4>Max Stake</h4>
+                            <div class="value">${maxStake.toString() === '0' ? 'No limit' : formatEther5(maxStake)}</div>
+                        </div>
+                    `;
+                }
             } catch (error) {
                 console.error('❌ Failed to refresh staking:', error);
             }
@@ -1152,6 +1402,111 @@
             const abs = negative ? -d : d;
             const formatted = formatEther5(abs);
             return `${negative ? '-' : '+'}${formatted}`;
+        }
+
+        /* ================= SLOTS SECTION ================= */
+        async function initSlotsSection() {
+            const section = document.getElementById('slots-section');
+            section.innerHTML = `
+                <h3>⚙️ Slots Configuration</h3>
+                
+                <div class="input-group">
+                    <label>House Edge Multiplier (HEM)</label>
+                    <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
+                        <button class="btn btn-info" onclick="checkHEM()" style="margin-top: 0;">Check Current HEM</button>
+                        <span id="current-hem-value" style="font-weight: bold; color: var(--info);"></span>
+                    </div>
+                    <input type="number" id="hem-value" placeholder="e.g., 9850" min="8000" max="12000">
+                    <small>Lower values = higher RTP (more player wins), Higher values = lower RTP (fewer player wins). Range: 8000-12000</small>
+                    <button class="btn btn-warning" onclick="setHEM()" style="margin-top: 10px;">Set HEM</button>
+                </div>
+                
+                <div class="input-group">
+                    <label>Set House Address</label>
+                    <input type="text" id="slots-house-address" placeholder="House contract address">
+                    <small>Update the House contract address for Slots</small>
+                    <button class="btn btn-warning" onclick="setSlotsHouse()" style="margin-top: 10px;">Set House</button>
+                </div>
+                
+                <div id="slots-result" class="result-display hidden"></div>
+            `;
+            
+            // Auto-load current HEM on initialization
+            try {
+                await checkHEM();
+            } catch (error) {
+                console.warn('Could not load initial HEM value:', error);
+            }
+        }
+
+
+        async function checkHEM() {
+            try {
+                showResult('slots-result', 'info', 'Checking current HEM value...');
+                document.getElementById('slots-result').classList.remove('hidden');
+                
+                const hemValue = await contracts.Slots.houseEdgeMultiplier();
+                const hemNumber = Number(hemValue);
+                
+                // Update the display
+                document.getElementById('current-hem-value').textContent = `Current HEM: ${hemNumber}`;
+                
+                showResult('slots-result', 'success', `Current HEM: ${hemNumber}`);
+            } catch (error) {
+                console.error('❌ Failed to check HEM:', error);
+                showResult('slots-result', 'error', 'Error: ' + error.message);
+            }
+        }
+
+        async function setHEM() {
+            if (!requireWallet()) return;
+            try {
+                const hemValue = parseInt(document.getElementById('hem-value').value);
+                
+                if (!hemValue || hemValue < 8000 || hemValue > 12000) {
+                    showResult('slots-result', 'error', 'HEM must be between 8000 and 12000');
+                    document.getElementById('slots-result').classList.remove('hidden');
+                    return;
+                }
+                
+                showResult('slots-result', 'info', `Setting HEM to ${hemValue}...`);
+                document.getElementById('slots-result').classList.remove('hidden');
+                
+                const tx = await contracts.Slots.setHouseEdgeMultiplier(hemValue);
+                await tx.wait();
+                
+                showResult('slots-result', 'success', `HEM set to ${hemValue} successfully! Tx: ${tx.hash}`);
+                
+                // Refresh HEM display after setting
+                await checkHEM();
+            } catch (error) {
+                console.error('❌ Failed to set HEM:', error);
+                showResult('slots-result', 'error', 'Error: ' + error.message);
+            }
+        }
+
+        async function setSlotsHouse() {
+            if (!requireWallet()) return;
+            try {
+                const houseAddress = document.getElementById('slots-house-address').value;
+                
+                if (!houseAddress || !ethers.isAddress(houseAddress)) {
+                    showResult('slots-result', 'error', 'Please enter a valid address');
+                    document.getElementById('slots-result').classList.remove('hidden');
+                    return;
+                }
+                
+                showResult('slots-result', 'info', `Setting House address to ${houseAddress}...`);
+                document.getElementById('slots-result').classList.remove('hidden');
+                
+                const tx = await contracts.Slots.setHouse(houseAddress);
+                await tx.wait();
+                
+                showResult('slots-result', 'success', `House address updated! Tx: ${tx.hash}`);
+            } catch (error) {
+                console.error('❌ Failed to set House address:', error);
+                showResult('slots-result', 'error', 'Error: ' + error.message);
+            }
         }
 
         // Initialize on load

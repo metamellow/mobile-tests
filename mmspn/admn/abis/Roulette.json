@@ -1,1 +1,563 @@
-[{"type":"constructor","payable":false,"inputs":[]},{"type":"error","name":"OwnableInvalidOwner","inputs":[{"type":"address","name":"owner"}]},{"type":"error","name":"OwnableUnauthorizedAccount","inputs":[{"type":"address","name":"account"}]},{"type":"event","anonymous":false,"name":"GameEnded","inputs":[{"type":"address","name":"player","indexed":true},{"type":"uint256","name":"gameId","indexed":true},{"type":"address","name":"token","indexed":false},{"type":"uint8","name":"winningNumber","indexed":false},{"type":"uint256","name":"totalPayout","indexed":false},{"type":"uint8","name":"numBets","indexed":false}]},{"type":"event","anonymous":false,"name":"GameStarted","inputs":[{"type":"address","name":"player","indexed":true},{"type":"uint256","name":"gameId","indexed":true},{"type":"address","name":"token","indexed":false},{"type":"uint256","name":"totalBet","indexed":false},{"type":"uint8","name":"numBets","indexed":false}]},{"type":"event","anonymous":false,"name":"HouseSet","inputs":[{"type":"address","name":"house","indexed":true}]},{"type":"event","anonymous":false,"name":"OwnershipTransferred","inputs":[{"type":"address","name":"previousOwner","indexed":true},{"type":"address","name":"newOwner","indexed":true}]},{"type":"function","name":"games","constant":true,"stateMutability":"view","payable":false,"gas":29000000,"inputs":[{"type":"uint256"}],"outputs":[{"type":"address","name":"player"},{"type":"address","name":"token"},{"type":"uint8","name":"winningNumber"},{"type":"uint256","name":"totalPayout"},{"type":"bool","name":"hasEnded"},{"type":"uint256","name":"gameId"},{"type":"uint256","name":"pendingAmount"}]},{"type":"function","name":"getAllPayouts","constant":true,"stateMutability":"view","payable":false,"gas":29000000,"inputs":[],"outputs":[{"type":"uint256[12]"}]},{"type":"function","name":"getBet","constant":true,"stateMutability":"view","payable":false,"gas":29000000,"inputs":[{"type":"uint256","name":"gameId"},{"type":"uint256","name":"betIndex"}],"outputs":[{"type":"tuple","components":[{"type":"uint8","name":"betType"},{"type":"uint256","name":"amount"},{"type":"uint8[]","name":"numbers"}]}]},{"type":"function","name":"getGame","constant":true,"stateMutability":"view","payable":false,"gas":29000000,"inputs":[{"type":"uint256","name":"gameId"}],"outputs":[{"type":"tuple","components":[{"type":"address","name":"player"},{"type":"tuple[]","name":"bets","components":[{"type":"uint8","name":"betType"},{"type":"uint256","name":"amount"},{"type":"uint8[]","name":"numbers"}]},{"type":"address","name":"token"},{"type":"uint8","name":"winningNumber"},{"type":"uint256","name":"totalPayout"},{"type":"bool","name":"hasEnded"},{"type":"uint256","name":"gameId"},{"type":"uint256","name":"pendingAmount"}]}]},{"type":"function","name":"getPayout","constant":true,"stateMutability":"view","payable":false,"gas":29000000,"inputs":[{"type":"uint8","name":"betType"}],"outputs":[{"type":"uint256"}]},{"type":"function","name":"house","constant":true,"stateMutability":"view","payable":false,"gas":29000000,"inputs":[],"outputs":[{"type":"address"}]},{"type":"function","name":"isRed","constant":true,"stateMutability":"view","payable":false,"gas":29000000,"inputs":[{"type":"uint8","name":"number"}],"outputs":[{"type":"bool"}]},{"type":"function","name":"nextGameId","constant":true,"stateMutability":"view","payable":false,"gas":29000000,"inputs":[],"outputs":[{"type":"uint256"}]},{"type":"function","name":"owner","constant":true,"stateMutability":"view","payable":false,"gas":29000000,"inputs":[],"outputs":[{"type":"address"}]},{"type":"function","name":"payouts","constant":true,"stateMutability":"view","payable":false,"gas":29000000,"inputs":[{"type":"uint8"}],"outputs":[{"type":"uint256"}]},{"type":"function","name":"play","constant":false,"stateMutability":"payable","payable":true,"gas":29000000,"inputs":[{"type":"address","name":"token"},{"type":"uint8[]","name":"betTypes"},{"type":"uint256[]","name":"amounts"},{"type":"uint8[][]","name":"betNumbers"}],"outputs":[{"type":"tuple","components":[{"type":"address","name":"player"},{"type":"tuple[]","name":"bets","components":[{"type":"uint8","name":"betType"},{"type":"uint256","name":"amount"},{"type":"uint8[]","name":"numbers"}]},{"type":"address","name":"token"},{"type":"uint8","name":"winningNumber"},{"type":"uint256","name":"totalPayout"},{"type":"bool","name":"hasEnded"},{"type":"uint256","name":"gameId"},{"type":"uint256","name":"pendingAmount"}]}]},{"type":"function","name":"redNumbers","constant":true,"stateMutability":"view","payable":false,"gas":29000000,"inputs":[{"type":"uint256"}],"outputs":[{"type":"uint8"}]},{"type":"function","name":"renounceOwnership","constant":false,"payable":false,"gas":29000000,"inputs":[],"outputs":[]},{"type":"function","name":"setHouse","constant":false,"payable":false,"gas":29000000,"inputs":[{"type":"address","name":"_house"}],"outputs":[]},{"type":"function","name":"transferOwnership","constant":false,"payable":false,"gas":29000000,"inputs":[{"type":"address","name":"newOwner"}],"outputs":[]}]
+[
+  {
+    "inputs": [],
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "owner",
+        "type": "address"
+      }
+    ],
+    "name": "OwnableInvalidOwner",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "OwnableUnauthorizedAccount",
+    "type": "error"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "player",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "gameId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint8",
+        "name": "winningNumber",
+        "type": "uint8"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "totalPayout",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint8",
+        "name": "numBets",
+        "type": "uint8"
+      }
+    ],
+    "name": "GameEnded",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "player",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "gameId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "totalBet",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint8",
+        "name": "numBets",
+        "type": "uint8"
+      }
+    ],
+    "name": "GameStarted",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "house",
+        "type": "address"
+      }
+    ],
+    "name": "HouseSet",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "previousOwner",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "newOwner",
+        "type": "address"
+      }
+    ],
+    "name": "OwnershipTransferred",
+    "type": "event"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "games",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "player",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      },
+      {
+        "internalType": "uint8",
+        "name": "winningNumber",
+        "type": "uint8"
+      },
+      {
+        "internalType": "uint256",
+        "name": "totalPayout",
+        "type": "uint256"
+      },
+      {
+        "internalType": "bool",
+        "name": "hasEnded",
+        "type": "bool"
+      },
+      {
+        "internalType": "uint256",
+        "name": "gameId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "pendingAmount",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getAllPayouts",
+    "outputs": [
+      {
+        "internalType": "uint256[12]",
+        "name": "",
+        "type": "uint256[12]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "gameId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "betIndex",
+        "type": "uint256"
+      }
+    ],
+    "name": "getBet",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "enum Roulette.BetType",
+            "name": "betType",
+            "type": "uint8"
+          },
+          {
+            "internalType": "uint256",
+            "name": "amount",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint8[]",
+            "name": "numbers",
+            "type": "uint8[]"
+          }
+        ],
+        "internalType": "struct Roulette.Bet",
+        "name": "",
+        "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "gameId",
+        "type": "uint256"
+      }
+    ],
+    "name": "getGame",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "address",
+            "name": "player",
+            "type": "address"
+          },
+          {
+            "components": [
+              {
+                "internalType": "enum Roulette.BetType",
+                "name": "betType",
+                "type": "uint8"
+              },
+              {
+                "internalType": "uint256",
+                "name": "amount",
+                "type": "uint256"
+              },
+              {
+                "internalType": "uint8[]",
+                "name": "numbers",
+                "type": "uint8[]"
+              }
+            ],
+            "internalType": "struct Roulette.Bet[]",
+            "name": "bets",
+            "type": "tuple[]"
+          },
+          {
+            "internalType": "address",
+            "name": "token",
+            "type": "address"
+          },
+          {
+            "internalType": "uint8",
+            "name": "winningNumber",
+            "type": "uint8"
+          },
+          {
+            "internalType": "uint256",
+            "name": "totalPayout",
+            "type": "uint256"
+          },
+          {
+            "internalType": "bool",
+            "name": "hasEnded",
+            "type": "bool"
+          },
+          {
+            "internalType": "uint256",
+            "name": "gameId",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "pendingAmount",
+            "type": "uint256"
+          }
+        ],
+        "internalType": "struct Roulette.Game",
+        "name": "",
+        "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "enum Roulette.BetType",
+        "name": "betType",
+        "type": "uint8"
+      }
+    ],
+    "name": "getPayout",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "house",
+    "outputs": [
+      {
+        "internalType": "address payable",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint8",
+        "name": "number",
+        "type": "uint8"
+      }
+    ],
+    "name": "isRed",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "nextGameId",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "owner",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "enum Roulette.BetType",
+        "name": "",
+        "type": "uint8"
+      }
+    ],
+    "name": "payouts",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      },
+      {
+        "internalType": "enum Roulette.BetType[]",
+        "name": "betTypes",
+        "type": "uint8[]"
+      },
+      {
+        "internalType": "uint256[]",
+        "name": "amounts",
+        "type": "uint256[]"
+      },
+      {
+        "internalType": "uint8[][]",
+        "name": "betNumbers",
+        "type": "uint8[][]"
+      }
+    ],
+    "name": "play",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "address",
+            "name": "player",
+            "type": "address"
+          },
+          {
+            "components": [
+              {
+                "internalType": "enum Roulette.BetType",
+                "name": "betType",
+                "type": "uint8"
+              },
+              {
+                "internalType": "uint256",
+                "name": "amount",
+                "type": "uint256"
+              },
+              {
+                "internalType": "uint8[]",
+                "name": "numbers",
+                "type": "uint8[]"
+              }
+            ],
+            "internalType": "struct Roulette.Bet[]",
+            "name": "bets",
+            "type": "tuple[]"
+          },
+          {
+            "internalType": "address",
+            "name": "token",
+            "type": "address"
+          },
+          {
+            "internalType": "uint8",
+            "name": "winningNumber",
+            "type": "uint8"
+          },
+          {
+            "internalType": "uint256",
+            "name": "totalPayout",
+            "type": "uint256"
+          },
+          {
+            "internalType": "bool",
+            "name": "hasEnded",
+            "type": "bool"
+          },
+          {
+            "internalType": "uint256",
+            "name": "gameId",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "pendingAmount",
+            "type": "uint256"
+          }
+        ],
+        "internalType": "struct Roulette.Game",
+        "name": "",
+        "type": "tuple"
+      }
+    ],
+    "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "redNumbers",
+    "outputs": [
+      {
+        "internalType": "uint8",
+        "name": "",
+        "type": "uint8"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "renounceOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address payable",
+        "name": "_house",
+        "type": "address"
+      }
+    ],
+    "name": "setHouse",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "newOwner",
+        "type": "address"
+      }
+    ],
+    "name": "transferOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  }
+]
