@@ -333,7 +333,7 @@
             // These can be edited in browser for temporary changes
             STARTING_POOL_AMOUNTS: {
                 ETH: "2.0",          // Starting ETH player pool amount
-                wTENX: "10000.0"     // Starting wTENX player pool amount
+                wTENX: "18935.32863"     // Starting wTENX player pool amount
             },
             
             // ABI File Paths (relative to this HTML file)
@@ -535,31 +535,49 @@
                     </div>
                 `;
 
-                // Pool amounts
+                // Pool amounts (accounting values from contract)
                 const ethPlayerPool = await contracts.House.playerPools(ethers.ZeroAddress);
                 const ethStakerPool = await contracts.House.stakerPools(ethers.ZeroAddress);
                 const wtenxPlayerPool = await contracts.House.playerPools(CONFIG.CONTRACT_ADDRESSES.wTENX);
                 const wtenxStakerPool = await contracts.House.stakerPools(CONFIG.CONTRACT_ADDRESSES.wTENX);
+
+                // Actual contract balances
+                const houseAddress = CONFIG.CONTRACT_ADDRESSES.House;
+                const actualEthBalance = await readOnlyProvider.getBalance(houseAddress);
+                const wtenxTokenContract = new ethers.Contract(CONFIG.CONTRACT_ADDRESSES.wTENX, abis.wTENToken, readOnlyProvider);
+                const actualWTENXBalance = await wtenxTokenContract.balanceOf(houseAddress);
 
                 const startingEthWei = ethers.parseEther(String(CONFIG.STARTING_POOL_AMOUNTS.ETH || '0'));
                 const startingWTENXWei = ethers.parseEther(String(CONFIG.STARTING_POOL_AMOUNTS.wTENX || '0'));
                 const ethGrowthWei = (BigInt(ethPlayerPool)) - (BigInt(startingEthWei));
                 const wtenxGrowthWei = (BigInt(wtenxPlayerPool)) - (BigInt(startingWTENXWei));
 
+                // Calculate difference between actual balance and accounting
+                const ethDiff = BigInt(actualEthBalance) - BigInt(ethPlayerPool) - BigInt(ethStakerPool);
+                const wtenxDiff = BigInt(actualWTENXBalance) - BigInt(wtenxPlayerPool) - BigInt(wtenxStakerPool);
+
                 document.getElementById('pool-stats').innerHTML = `
                     <div class="stat-card">
-                        <h4>ETH Player Pool</h4>
+                        <h4>ETH Player Pool (Accounting)</h4>
                         <div class="value">${formatEther5(ethPlayerPool)} ETH</div>
                         <small>${formatEther5Signed(ethGrowthWei)} ETH</small>
+                        <small style="color: ${ethDiff !== 0n ? 'var(--warning)' : 'var(--text-secondary)'}; margin-top: 5px; display: block;">
+                            Actual Balance: ${formatEther5(actualEthBalance)} ETH
+                            ${ethDiff !== 0n ? ` (Diff: ${formatEther5Signed(ethDiff)})` : ''}
+                        </small>
                     </div>
                     <div class="stat-card">
                         <h4>ETH Staker Pool</h4>
                         <div class="value">${formatEther5(ethStakerPool)} ETH</div>
                     </div>
                     <div class="stat-card">
-                        <h4>wTENX Player Pool</h4>
+                        <h4>wTENX Player Pool (Accounting)</h4>
                         <div class="value">${formatEther5(wtenxPlayerPool)} wTENX</div>
                         <small>${formatEther5Signed(wtenxGrowthWei)} wTENX</small>
+                        <small style="color: ${wtenxDiff !== 0n ? 'var(--warning)' : 'var(--text-secondary)'}; margin-top: 5px; display: block;">
+                            Actual Balance: ${formatEther5(actualWTENXBalance)} wTENX
+                            ${wtenxDiff !== 0n ? ` (Diff: ${formatEther5Signed(wtenxDiff)})` : ''}
+                        </small>
                     </div>
                     <div class="stat-card">
                         <h4>wTENX Staker Pool</h4>
@@ -606,18 +624,15 @@
                     <div>
                         <h3>🏠 House Contract</h3>
                         <button class="btn btn-info" onclick="dumpHouseData()">🔄 Refresh House Data</button>
-                        <div id="house-data-dump" class="result-display info" style="margin-top: 15px; white-space: pre-wrap; font-size: 11px; max-height: 500px; overflow-y: auto;"></div>
+                        <div id="house-data-dump" class="result-display info" style="margin-top: 15px; white-space: pre-wrap; font-size: 11px; max-height: 500px; overflow-y: auto;">Click "Refresh House Data" to load contract information.</div>
                     </div>
                     <div>
                         <h3>🎰 Slots Contract</h3>
                         <button class="btn btn-info" onclick="dumpSlotsData()">🔄 Refresh Slots Data</button>
-                        <div id="slots-data-dump" class="result-display info" style="margin-top: 15px; white-space: pre-wrap; font-size: 11px; max-height: 500px; overflow-y: auto;"></div>
+                        <div id="slots-data-dump" class="result-display info" style="margin-top: 15px; white-space: pre-wrap; font-size: 11px; max-height: 500px; overflow-y: auto;">Click "Refresh Slots Data" to load contract information.</div>
                     </div>
                 </div>
             `;
-            // Load data on initialization
-            await dumpHouseData();
-            await dumpSlotsData();
         }
 
         async function dumpHouseData() {
@@ -879,8 +894,31 @@
         async function initAdminSection() {
             const section = document.getElementById('admin-section');
             section.innerHTML = `
+                <!-- Claim Rewards & View Config -->
                 <div class="two-column">
-                    <!-- Token Management -->
+                    <div>
+                        <h3>💰 Claim Rewards</h3>
+                        <div class="input-group">
+                            <label>Token to Claim</label>
+                            <select id="claim-token-select">
+                                <option value="ETH">ETH</option>
+                                <option value="wTENX">wTENX</option>
+                            </select>
+                            <small>Select the token you want to claim rewards for</small>
+                        </div>
+                        <div class="input-group">
+                            <button class="btn btn-success" onclick="claimRewards()">🎁 Claim Rewards</button>
+                        </div>
+                    </div>
+                    <div>
+                        <h3>📋 View Current Config</h3>
+                        <button class="btn btn-info" onclick="viewCurrentConfig()">View Config</button>
+                        <div id="admin-result" class="result-display hidden"></div>
+                    </div>
+                </div>
+                
+                <!-- Token & Game Management -->
+                <div class="two-column">
                     <div>
                         <h3>🪙 Token Management</h3>
                         <div class="input-group">
@@ -903,8 +941,6 @@
                             <button class="btn btn-success" onclick="setTokenConfig()">Set Config</button>
                         </div>
                     </div>
-                    
-                    <!-- Game Management -->
                     <div>
                         <h3>🎮 Game Management</h3>
                         <div class="input-group">
@@ -932,8 +968,34 @@
                     </div>
                 </div>
                 
+                <!-- Pool & Staking Management -->
                 <div class="two-column">
-                    <!-- Staking Config -->
+                    <div>
+                        <h3>💰 Pool Management</h3>
+                        <div class="input-group">
+                            <label>Fund Player Pool</label>
+                            <select id="fund-pool-token">
+                                <option value="ETH">ETH</option>
+                                <option value="wTENX">wTENX</option>
+                            </select>
+                            <input type="text" id="fund-pool-amount" placeholder="Amount">
+                            <div style="display: flex; gap: 10px; margin-top: 10px;">
+                                <button class="btn btn-success" onclick="fundPlayerPool()">Fund (Accounting Only)</button>
+                                <button class="btn btn-warning" onclick="sendAndFundPlayerPool()">Send + Fund</button>
+                            </div>
+                            <small style="color: var(--text-secondary); display: block; margin-top: 5px;">
+                                <strong>Fund:</strong> Updates accounting only (tokens must already be in contract)<br>
+                                <strong>Send + Fund:</strong> Transfers tokens from wallet to contract, then updates accounting
+                            </small>
+                        </div>
+                        <div class="input-group">
+                            <label>Rescue Tokens/ETH</label>
+                            <input type="text" id="rescue-token-address" placeholder="Token address (0x0 for ETH)">
+                            <input type="text" id="rescue-amount" placeholder="Amount">
+                            <input type="text" id="rescue-to-address" placeholder="To address" value="${account || ''}">
+                            <button class="btn btn-danger" onclick="rescueTokens()">Rescue</button>
+                        </div>
+                    </div>
                     <div>
                         <h3>⚙️ Staking Configuration</h3>
                         <div class="input-group">
@@ -957,33 +1019,12 @@
                             <button class="btn btn-warning" onclick="setStakingToken()">Change Token</button>
                         </div>
                     </div>
-                    
-                    <!-- Pool Management -->
-                    <div>
-                        <h3>💰 Pool Management</h3>
-                        <div class="input-group">
-                            <label>Fund Player Pool</label>
-                            <select id="fund-pool-token">
-                                <option value="ETH">ETH</option>
-                                <option value="wTENX">wTENX</option>
-                            </select>
-                            <input type="text" id="fund-pool-amount" placeholder="Amount">
-                            <button class="btn btn-success" onclick="fundPlayerPool()">Fund Pool</button>
-                        </div>
-                        <div class="input-group">
-                            <label>Rescue Tokens/ETH</label>
-                            <input type="text" id="rescue-token-address" placeholder="Token address (0x0 for ETH)">
-                            <input type="text" id="rescue-amount" placeholder="Amount">
-                            <input type="text" id="rescue-to-address" placeholder="To address" value="${account || ''}">
-                            <button class="btn btn-danger" onclick="rescueTokens()">Rescue</button>
-                        </div>
-                    </div>
                 </div>
                 
+                <!-- System Settings -->
                 <div class="two-column">
-                    <!-- Other Admin Functions -->
                     <div>
-                        <h3>🔧 Other Admin Functions</h3>
+                        <h3>🔧 System Settings</h3>
                         <div class="input-group">
                             <label>Set Dev Wallet</label>
                             <input type="text" id="dev-wallet-address" placeholder="Dev wallet address">
@@ -1011,12 +1052,8 @@
                             <button class="btn btn-warning" onclick="setPointsAdjuster()">Update</button>
                         </div>
                     </div>
-                    
-                    <!-- View Current Config -->
                     <div>
-                        <h3>📋 View Current Config</h3>
-                        <button class="btn btn-info" onclick="viewCurrentConfig()">View Config</button>
-                        <div id="admin-result" class="result-display hidden"></div>
+                        <!-- Empty column for spacing -->
                     </div>
                 </div>
             `;
@@ -1143,23 +1180,63 @@
                 const tokenAddress = tokenSelect === 'ETH' ? ethers.ZeroAddress : CONFIG.CONTRACT_ADDRESSES.wTENX;
                 const amount = ethers.parseEther(document.getElementById('fund-pool-amount').value);
                 
-                showResult('admin-result', 'info', 'Funding player pool...');
+                showResult('admin-result', 'info', 'Updating player pool accounting (tokens must already be in contract)...');
                 document.getElementById('admin-result').classList.remove('hidden');
                 
-                let tx;
-                if (tokenSelect === 'ETH') {
-                    // For ETH, need to send value
-                    tx = await contracts.House.fundPlayerPool(tokenAddress, amount, { value: amount });
-                } else {
-                    // For tokens, approve first
-                    const tokenContract = new ethers.Contract(tokenAddress, abis.wTENToken, signer);
-                    const approveTx = await tokenContract.approve(CONFIG.CONTRACT_ADDRESSES.House, amount);
-                    await approveTx.wait();
-                    tx = await contracts.House.fundPlayerPool(tokenAddress, amount);
-                }
+                // Just update accounting - assumes tokens are already in contract
+                const tx = await contracts.House.fundPlayerPool(tokenAddress, amount);
                 await tx.wait();
                 
-                showResult('admin-result', 'success', `Player pool funded! Tx: ${tx.hash}`);
+                showResult('admin-result', 'success', `Player pool accounting updated! Tx: ${tx.hash}`);
+                
+                // Refresh stats
+                await refreshStats();
+            } catch (error) {
+                showResult('admin-result', 'error', 'Error: ' + error.message);
+            }
+        }
+
+        async function sendAndFundPlayerPool() {
+            if (!requireWallet()) return;
+            try {
+                const tokenSelect = document.getElementById('fund-pool-token').value;
+                const tokenAddress = tokenSelect === 'ETH' ? ethers.ZeroAddress : CONFIG.CONTRACT_ADDRESSES.wTENX;
+                const amount = ethers.parseEther(document.getElementById('fund-pool-amount').value);
+                
+                showResult('admin-result', 'info', 'Sending tokens to contract and updating accounting...');
+                document.getElementById('admin-result').classList.remove('hidden');
+                
+                if (tokenSelect === 'ETH') {
+                    // For ETH, send directly to contract address
+                    showResult('admin-result', 'info', 'Sending ETH to contract...');
+                    const sendTx = await signer.sendTransaction({
+                        to: CONFIG.CONTRACT_ADDRESSES.House,
+                        value: amount
+                    });
+                    await sendTx.wait();
+                    
+                    showResult('admin-result', 'info', 'ETH sent! Updating accounting...');
+                    const fundTx = await contracts.House.fundPlayerPool(tokenAddress, amount);
+                    await fundTx.wait();
+                    
+                    showResult('admin-result', 'success', `ETH sent and player pool funded! Send Tx: ${sendTx.hash}, Fund Tx: ${fundTx.hash}`);
+                } else {
+                    // For tokens, transfer directly (no approval needed for transfer())
+                    const tokenContract = new ethers.Contract(tokenAddress, abis.wTENToken, signer);
+                    
+                    showResult('admin-result', 'info', 'Transferring tokens to contract...');
+                    const transferTx = await tokenContract.transfer(CONFIG.CONTRACT_ADDRESSES.House, amount);
+                    await transferTx.wait();
+                    
+                    showResult('admin-result', 'info', 'Tokens transferred! Updating accounting...');
+                    const fundTx = await contracts.House.fundPlayerPool(tokenAddress, amount);
+                    await fundTx.wait();
+                    
+                    showResult('admin-result', 'success', `Tokens sent and player pool funded! Transfer Tx: ${transferTx.hash}, Fund Tx: ${fundTx.hash}`);
+                }
+                
+                // Refresh stats
+                await refreshStats();
             } catch (error) {
                 showResult('admin-result', 'error', 'Error: ' + error.message);
             }
@@ -1284,7 +1361,7 @@
                 <button class="btn btn-info" onclick="viewUserStaking()">View User Staking</button>
                 <div id="staking-result" class="result-display hidden"></div>
                 
-                <button class="btn btn-info" onclick="refreshStaking()">🔄 Refresh Staking Data</button>
+                <button class="btn btn-info" onclick="refreshStaking()" style="margin-top: 20px;">🔄 Refresh Staking Data</button>
             `;
             await refreshStaking();
         }
@@ -1350,6 +1427,36 @@
                 showResult('staking-result', 'error', 'Error: ' + error.message);
             }
         }
+
+        async function claimRewards() {
+            if (!requireWallet()) return;
+            try {
+                const tokenSelect = document.getElementById('claim-token-select').value;
+                const tokenAddress = tokenSelect === 'ETH' ? ethers.ZeroAddress : CONFIG.CONTRACT_ADDRESSES.wTENX;
+                
+                showResult('admin-result', 'info', `Claiming ${tokenSelect} rewards...`);
+                document.getElementById('admin-result').classList.remove('hidden');
+                
+                // Check pending rewards first
+                const pending = await contracts.House.pendingRewards(account, tokenAddress);
+                if (pending === 0n) {
+                    showResult('admin-result', 'error', 'No pending rewards to claim');
+                    return;
+                }
+                
+                const tx = await contracts.House.claimRewards(tokenAddress);
+                await tx.wait();
+                
+                showResult('admin-result', 'success', `✅ ${tokenSelect} rewards claimed successfully! Tx: ${tx.hash}\n\nClaimed: ${formatEther5(pending)} ${tokenSelect}`);
+                
+                // Refresh staking data
+                await viewUserStaking();
+            } catch (error) {
+                console.error('❌ Failed to claim rewards:', error);
+                showResult('admin-result', 'error', 'Error: ' + error.message);
+            }
+        }
+
 
         /* ================= HELPER FUNCTIONS ================= */
         function showLoading(show) {
