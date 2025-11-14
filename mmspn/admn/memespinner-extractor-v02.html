@@ -77,7 +77,8 @@
             color: #e0e0e0;
         }
 
-        .input-group input {
+        .input-group input,
+        .input-group textarea {
             width: 100%;
             padding: 10px;
             border: 1px solid rgba(255, 255, 255, 0.2);
@@ -85,6 +86,12 @@
             background: rgba(255, 255, 255, 0.1);
             color: #fff;
             font-size: 14px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .input-group textarea {
+            min-height: 100px;
+            resize: vertical;
         }
 
         .btn {
@@ -195,8 +202,10 @@
         <div class="section">
             <h2>⚙️ Configuration</h2>
             <div class="input-group">
-                <label>RPC URL</label>
-                <input type="text" id="rpc-url" value="https://testnet-rpc.ten.xyz/v1/?token=34F99D7ACF7B6940A0381D89DFF468600515D531">
+                <label>RPC URLs (one per line - will cycle through them)</label>
+                <textarea id="rpc-urls" rows="3">https://testnet-rpc.ten.xyz/v1/?token=34F99D7ACF7B6940A0381D89DFF468600515D531
+https://testnet-rpc.ten.xyz/v1/?token=52F88E90A28413C8B42664A5358B8DB630127AAB
+https://testnet-rpc.ten.xyz/v1/?token=8805E030F2253A88CA67A8B987999F268E1A9179</textarea>
             </div>
             <div class="input-group">
                 <label>Slots Contract Address</label>
@@ -262,14 +271,31 @@
             "function feeBps(address token) view returns (uint256)"
         ];
 
-        let provider = null;
-        let slotsContract = null;
-        let houseContract = null;
+        let rpcUrls = [];
+        let rpcIndex = 0;
         let extractedData = [];
         let isPaused = false;
         let currentGameId = 0;
         let maxGameId = 0;
         let checkpoint = null;
+        let slotsAddress = null;
+        let houseAddress = null;
+
+        // Get next RPC URL in rotation
+        function getNextRpcUrl() {
+            if (rpcUrls.length === 0) return null;
+            const url = rpcUrls[rpcIndex];
+            rpcIndex = (rpcIndex + 1) % rpcUrls.length;
+            return url;
+        }
+
+        // Create provider and contracts for a specific RPC
+        function createProviderAndContracts(rpcUrl) {
+            const provider = new ethers.JsonRpcProvider(rpcUrl);
+            const slotsContract = new ethers.Contract(slotsAddress, SLOTS_ABI, provider);
+            const houseContract = new ethers.Contract(houseAddress, HOUSE_ABI, provider);
+            return { provider, slotsContract, houseContract };
+        }
 
         // Load checkpoint from localStorage
         function loadCheckpoint() {
@@ -405,7 +431,16 @@
         }
 
         // Extract game data - optimized to use GameEnded event (single call)
+        // Now uses rotating RPCs - each call gets a new provider/contracts
         async function extractGameData(gameId) {
+            // Get next RPC URL and create fresh provider/contracts
+            const rpcUrl = getNextRpcUrl();
+            if (!rpcUrl) {
+                throw new Error('No RPC URLs configured');
+            }
+
+            const { provider, slotsContract, houseContract } = createProviderAndContracts(rpcUrl);
+
             try {
                 // Get GameEnded event - this has all the data we need in one call
                 const filter = slotsContract.filters.GameEnded(null, gameId);
@@ -503,7 +538,7 @@
                     spins
                 };
             } catch (error) {
-                console.error(`Error extracting game ${gameId}:`, error);
+                console.error(`Error extracting game ${gameId} with RPC ${rpcUrl}:`, error);
                 throw error;
             }
         }
@@ -511,18 +546,30 @@
         // Start extraction
         async function startExtraction() {
             try {
-                const rpcUrl = document.getElementById('rpc-url').value;
-                const slotsAddress = document.getElementById('slots-address').value;
-                const houseAddress = document.getElementById('house-address').value;
+                // Parse RPC URLs from textarea
+                const rpcUrlsText = document.getElementById('rpc-urls').value.trim();
+                rpcUrls = rpcUrlsText.split('\n')
+                    .map(url => url.trim())
+                    .filter(url => url.length > 0);
+                
+                if (rpcUrls.length === 0) {
+                    updateStatus('Error: Please provide at least one RPC URL', 'error');
+                    return;
+                }
+
+                slotsAddress = document.getElementById('slots-address').value;
+                houseAddress = document.getElementById('house-address').value;
                 const startGameId = parseInt(document.getElementById('start-game-id').value);
                 const endGameId = parseInt(document.getElementById('end-game-id').value);
                 const maxGames = parseInt(document.getElementById('max-games').value);
                 const requestDelay = parseInt(document.getElementById('request-delay').value);
 
-                // Initialize provider and contracts (ethers v6)
-                provider = new ethers.JsonRpcProvider(rpcUrl);
-                slotsContract = new ethers.Contract(slotsAddress, SLOTS_ABI, provider);
-                houseContract = new ethers.Contract(houseAddress, HOUSE_ABI, provider);
+                // Reset RPC index
+                rpcIndex = 0;
+
+                // Initialize with first RPC to get max game ID
+                const initialRpc = rpcUrls[0];
+                const { provider, slotsContract } = createProviderAndContracts(initialRpc);
 
                 // Get max game ID (ethers v6)
                 if (endGameId === 0) {
@@ -536,7 +583,7 @@
                 currentGameId = startGameId - 1;
                 isPaused = false;
 
-                updateStatus(`Starting extraction from game ${startGameId} to ${maxGameId}...`, 'info');
+                updateStatus(`Starting extraction from game ${startGameId} to ${maxGameId} (using ${rpcUrls.length} RPC(s))...`, 'info');
 
                 let processed = 0;
                 const targetGames = maxGames > 0 ? Math.min(maxGames, maxGameId - startGameId + 1) : (maxGameId - startGameId + 1);
@@ -705,4 +752,3 @@
     </script>
 </body>
 </html>
-
