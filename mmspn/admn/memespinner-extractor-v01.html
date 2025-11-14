@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Memespin Slots - Tenscan Data Extractor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bai+Jamjuree:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.15.0/ethers.umd.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Bai Jamjuree', sans-serif;
+            background: #000000;
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            background: linear-gradient(to right, #57D67B, #E9B466, #FA69E3);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .section {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            backdrop-filter: blur(10px);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .section h2 {
+            font-size: 1.5rem;
+            margin-bottom: 15px;
+            background: linear-gradient(to right, #57D67B, #E9B466, #FA69E3);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 10px;
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #e0e0e0;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            font-size: 14px;
+        }
+
+        .btn {
+            background: linear-gradient(to right, #57D67B, #E9B466, #FA69E3);
+            border: none;
+            color: #000;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 700;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+            font-family: 'Bai Jamjuree', sans-serif;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-success { background: linear-gradient(to right, #57D67B, #E9B466); }
+        .btn-info { background: linear-gradient(to right, #E9B466, #FA69E3); }
+
+        .status {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+
+        .status.success { border-left: 4px solid #56ab2f; }
+        .status.error { border-left: 4px solid #ff416c; }
+        .status.info { border-left: 4px solid #45b7d1; }
+
+        .progress {
+            width: 100%;
+            height: 20px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(to right, #57D67B, #E9B466, #FA69E3);
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #000;
+            font-weight: bold;
+            font-size: 12px;
+            font-family: 'Bai Jamjuree', sans-serif;
+        }
+
+        .results {
+            max-height: 400px;
+            overflow-y: auto;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 10px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .spinner {
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-top: 3px solid #fff;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            margin-right: 10px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎰 Memespin Slots - Tenscan Data Extractor</h1>
+            <p>Extract comprehensive game data from blockchain and export to CSV</p>
+        </div>
+
+        <div class="section">
+            <h2>⚙️ Configuration</h2>
+            <div class="input-group">
+                <label>RPC URL</label>
+                <input type="text" id="rpc-url" value="https://testnet-rpc.ten.xyz/v1/?token=34F99D7ACF7B6940A0381D89DFF468600515D531">
+            </div>
+            <div class="input-group">
+                <label>Slots Contract Address</label>
+                <input type="text" id="slots-address" value="0x1AdD159DC347b94252d134655eA94e0d63Cc086e">
+            </div>
+            <div class="input-group">
+                <label>House Contract Address</label>
+                <input type="text" id="house-address" value="0x9CC5805A71571f3306b7357546566Ef4CbF78F1C">
+            </div>
+            <div class="input-group">
+                <label>Start Game ID</label>
+                <input type="number" id="start-game-id" value="1" min="1">
+            </div>
+            <div class="input-group">
+                <label>End Game ID (0 = auto-detect)</label>
+                <input type="number" id="end-game-id" value="0" min="0">
+            </div>
+            <div class="input-group">
+                <label>Max Games to Process (0 = all)</label>
+                <input type="number" id="max-games" value="10" min="0">
+            </div>
+            <div class="input-group">
+                <label>Delay Between Requests (ms) - Higher = slower but safer</label>
+                <input type="number" id="request-delay" value="500" min="100">
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>📊 Status</h2>
+            <div id="status" class="status info">Ready to start extraction</div>
+            <div class="progress hidden" id="progress-container">
+                <div class="progress-bar" id="progress-bar" style="width: 0%">0%</div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>🎮 Controls</h2>
+            <button class="btn btn-success" onclick="startExtraction()">🚀 Start Extraction</button>
+            <button class="btn btn-info" onclick="pauseExtraction()">⏸️ Pause</button>
+            <button class="btn btn-info" onclick="resumeExtraction()">▶️ Resume</button>
+            <button class="btn btn-info" onclick="downloadCSV()">📥 Download CSV</button>
+            <button class="btn btn-info" onclick="clearResults()">🗑️ Clear Results</button>
+        </div>
+
+        <div class="section">
+            <h2>📋 Results</h2>
+            <div id="results" class="results">No data extracted yet. Click "Start Extraction" to begin.</div>
+        </div>
+    </div>
+
+    <script>
+        // Slots ABI (minimal - only what we need)
+        const SLOTS_ABI = [
+            "function nextGameId() view returns (uint256)",
+            "function getGame(uint256 gameId) view returns (tuple(address player, uint256 betAmount, address token, uint8 numSpins, uint8[] num0, uint8[] num1, uint8[] num2, uint256 payout, bool hasEnded, uint256 gameId, uint256 pendingAmount))",
+            "event GameEnded(address indexed player, uint256 indexed gameId, address token, uint256 bet, uint256 payout, uint8 numSpins, uint8[] num0, uint8[] num1, uint8[] num2)"
+        ];
+
+        // House ABI (minimal)
+        const HOUSE_ABI = [
+            "function playerPools(address token) view returns (uint256)",
+            "function devFeesCollected(address token) view returns (uint256)",
+            "function feeBps(address token) view returns (uint256)"
+        ];
+
+        let provider = null;
+        let slotsContract = null;
+        let houseContract = null;
+        let extractedData = [];
+        let isPaused = false;
+        let currentGameId = 0;
+        let maxGameId = 0;
+        let checkpoint = null;
+
+        // Load checkpoint from localStorage
+        function loadCheckpoint() {
+            const saved = localStorage.getItem('tenscan-extractor-checkpoint');
+            if (saved) {
+                checkpoint = JSON.parse(saved);
+                document.getElementById('start-game-id').value = checkpoint.lastGameId + 1;
+                extractedData = checkpoint.data || [];
+                updateResults();
+            }
+        }
+
+        // Save checkpoint to localStorage
+        function saveCheckpoint() {
+            checkpoint = {
+                lastGameId: currentGameId,
+                data: extractedData,
+                timestamp: Date.now()
+            };
+            localStorage.setItem('tenscan-extractor-checkpoint', JSON.stringify(checkpoint));
+        }
+
+        // Clear checkpoint
+        function clearCheckpoint() {
+            localStorage.removeItem('tenscan-extractor-checkpoint');
+            checkpoint = null;
+        }
+
+        // Update status
+        function updateStatus(message, type = 'info') {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+        }
+
+        // Update progress
+        function updateProgress(current, total) {
+            const progressContainer = document.getElementById('progress-container');
+            const progressBar = document.getElementById('progress-bar');
+            if (total > 0) {
+                progressContainer.classList.remove('hidden');
+                const percent = Math.round((current / total) * 100);
+                progressBar.style.width = `${percent}%`;
+                progressBar.textContent = `${percent}% (${current}/${total})`;
+            } else {
+                progressContainer.classList.add('hidden');
+            }
+        }
+
+        // Update results display
+        function updateResults() {
+            const resultsEl = document.getElementById('results');
+            if (extractedData.length === 0) {
+                resultsEl.textContent = 'No data extracted yet.';
+                return;
+            }
+            resultsEl.textContent = `Extracted ${extractedData.length} game(s).\n\nFirst game preview:\n${JSON.stringify(extractedData[0], null, 2)}`;
+        }
+
+        // Format ether value (ethers v6)
+        function formatEther(value) {
+            if (!value) return '0';
+            return ethers.formatEther(value.toString());
+        }
+
+        // Get token name
+        function getTokenName(address) {
+            const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
+            return address.toLowerCase() === ZERO_ADDRESS.toLowerCase() ? 'ETH' : 'wTENX';
+        }
+
+        // Symbol names mapping (matches getImageFromSymbol.ts)
+        const symbolNames = ['LEAFS', 'THNDR', 'STARS', 'CROWN', 'DIAMD', 'MEMES', 'SPINS'];
+        
+        // Get symbol name by index
+        function getSymbolName(index) {
+            if (index < 0 || index >= symbolNames.length) {
+                return 'LEAFS';
+            }
+            return symbolNames[index];
+        }
+
+        // Get reel result string (e.g., "SPIN.SPIN.MEME")
+        function getReelResult(reel1, reel2, reel3) {
+            return `${getSymbolName(reel1)}.${getSymbolName(reel2)}.${getSymbolName(reel3)}`;
+        }
+
+        // Cache for feeBps per token (to avoid repeated calls)
+        const feeBpsCache = {};
+
+        // Calculate multiplier for a spin
+        function calculateSpinMultiplier(reel1, reel2, reel3) {
+            // Payout table (from getImageFromSymbol.ts)
+            const payoutTable = [
+                { symbols: [1, 0, 2], payout: 2.5 }, { symbols: [1, 0, 3], payout: 2.5 }, { symbols: [1, 0, 4], payout: 2.5 },
+                { symbols: [0, 1, 2], payout: 2.5 }, { symbols: [0, 1, 3], payout: 2.5 }, { symbols: [0, 1, 4], payout: 2.5 },
+                { symbols: [2, 1, 0], payout: 2.5 }, { symbols: [3, 1, 0], payout: 2.5 }, { symbols: [4, 1, 0], payout: 2.5 },
+                { symbols: [2, 0, 1], payout: 2.5 }, { symbols: [3, 0, 1], payout: 2.5 }, { symbols: [4, 0, 1], payout: 2.5 },
+                { symbols: [1, 2, 0], payout: 2.5 }, { symbols: [1, 3, 0], payout: 2.5 }, { symbols: [1, 4, 0], payout: 2.5 },
+                { symbols: [0, 2, 1], payout: 2.5 }, { symbols: [0, 3, 1], payout: 2.5 }, { symbols: [0, 4, 1], payout: 2.5 },
+                { symbols: [0, 0, 0], payout: 3 },
+                { symbols: [2, 2, 3], payout: 4 }, { symbols: [2, 2, 4], payout: 4 }, { symbols: [3, 3, 2], payout: 4 },
+                { symbols: [3, 3, 4], payout: 4 }, { symbols: [4, 4, 2], payout: 4 }, { symbols: [4, 4, 3], payout: 4 },
+                { symbols: [3, 2, 2], payout: 4 }, { symbols: [4, 2, 2], payout: 4 }, { symbols: [2, 3, 3], payout: 4 },
+                { symbols: [4, 3, 3], payout: 4 }, { symbols: [2, 4, 4], payout: 4 }, { symbols: [3, 4, 4], payout: 4 },
+                { symbols: [2, 2, 5], payout: 8 }, { symbols: [2, 2, 6], payout: 8 }, { symbols: [3, 3, 5], payout: 8 },
+                { symbols: [3, 3, 6], payout: 8 }, { symbols: [4, 4, 5], payout: 8 }, { symbols: [4, 4, 6], payout: 8 },
+                { symbols: [2, 5, 2], payout: 8 }, { symbols: [2, 6, 2], payout: 8 }, { symbols: [3, 5, 3], payout: 8 },
+                { symbols: [3, 6, 3], payout: 8 }, { symbols: [4, 5, 4], payout: 8 }, { symbols: [4, 6, 4], payout: 8 },
+                { symbols: [5, 2, 2], payout: 8 }, { symbols: [6, 2, 2], payout: 8 }, { symbols: [5, 3, 3], payout: 8 },
+                { symbols: [6, 3, 3], payout: 8 }, { symbols: [5, 4, 4], payout: 8 }, { symbols: [6, 4, 4], payout: 8 },
+                { symbols: [5, 5, 0], payout: 15 }, { symbols: [5, 5, 1], payout: 15 }, { symbols: [5, 5, 2], payout: 15 },
+                { symbols: [5, 5, 3], payout: 15 }, { symbols: [5, 5, 4], payout: 15 }, { symbols: [0, 5, 5], payout: 15 },
+                { symbols: [1, 5, 5], payout: 15 }, { symbols: [2, 5, 5], payout: 15 }, { symbols: [3, 5, 5], payout: 15 },
+                { symbols: [4, 5, 5], payout: 15 }, { symbols: [5, 0, 5], payout: 15 }, { symbols: [5, 1, 5], payout: 15 },
+                { symbols: [5, 2, 5], payout: 15 }, { symbols: [5, 3, 5], payout: 15 }, { symbols: [5, 4, 5], payout: 15 },
+                { symbols: [6, 6, 0], payout: 20 }, { symbols: [6, 6, 1], payout: 20 }, { symbols: [6, 6, 2], payout: 20 },
+                { symbols: [6, 6, 3], payout: 20 }, { symbols: [6, 6, 4], payout: 20 }, { symbols: [0, 6, 6], payout: 20 },
+                { symbols: [1, 6, 6], payout: 20 }, { symbols: [2, 6, 6], payout: 20 }, { symbols: [3, 6, 6], payout: 20 },
+                { symbols: [4, 6, 6], payout: 20 }, { symbols: [6, 0, 6], payout: 20 }, { symbols: [6, 1, 6], payout: 20 },
+                { symbols: [6, 2, 6], payout: 20 }, { symbols: [6, 3, 6], payout: 20 }, { symbols: [6, 4, 6], payout: 20 },
+                { symbols: [5, 5, 5], payout: 30 }, { symbols: [5, 6, 5], payout: 30 }, { symbols: [6, 5, 5], payout: 30 },
+                { symbols: [5, 5, 6], payout: 30 },
+                { symbols: [6, 5, 6], payout: 50 }, { symbols: [6, 6, 6], payout: 50 }
+            ];
+
+            const match = payoutTable.find(entry => 
+                entry.symbols[0] === reel1 && 
+                entry.symbols[1] === reel2 && 
+                entry.symbols[2] === reel3
+            );
+            return match ? match.payout : 0;
+        }
+
+        // Extract game data - optimized to use GameEnded event (single call)
+        async function extractGameData(gameId) {
+            try {
+                // Get GameEnded event - this has all the data we need in one call
+                const filter = slotsContract.filters.GameEnded(null, gameId);
+                const events = await slotsContract.queryFilter(filter);
+                
+                if (events.length === 0) {
+                    return null; // Game doesn't exist or hasn't ended
+                }
+
+                const event = events[0];
+                if (!event.args) {
+                    return null;
+                }
+
+                // Extract data from event
+                const player = event.args.player;
+                const token = event.args.token;
+                const bet = event.args.bet;
+                const payout = event.args.payout;
+                const numSpins = Number(event.args.numSpins);
+                const num0 = event.args.num0;
+                const num1 = event.args.num1;
+                const num2 = event.args.num2;
+                const blockNumber = event.blockNumber;
+                const transactionHash = event.transactionHash;
+
+                // Get block for timestamp (only call we need)
+                let timestamp = null;
+                try {
+                    const block = await provider.getBlock(blockNumber);
+                    timestamp = new Date(Number(block.timestamp) * 1000).toISOString();
+                } catch (e) {
+                    console.warn('Could not fetch block data:', e);
+                }
+
+                // Format values
+                const betPerSpin = formatEther(bet);
+                const totalBet = parseFloat(betPerSpin) * numSpins;
+                const totalPayout = formatEther(payout);
+                const tokenName = getTokenName(token);
+
+                // Get feeBps (cache it per token to avoid repeated calls)
+                let feeBps = feeBpsCache[token];
+                if (feeBps === undefined) {
+                    try {
+                        feeBps = await houseContract.feeBps(token);
+                        feeBpsCache[token] = feeBps;
+                    } catch (e) {
+                        console.warn('Could not fetch feeBps:', e);
+                        feeBps = 0;
+                    }
+                }
+
+                // Calculate dev fee as percentage of total bet
+                const devFeeBps = Number(feeBps);
+                const devFeeAmount = (totalBet * devFeeBps) / 10000;
+                const devFee = devFeeAmount.toFixed(6);
+
+                // Process each spin
+                const spins = [];
+                for (let i = 0; i < numSpins; i++) {
+                    const reel1 = Number(num0[i]);
+                    const reel2 = Number(num1[i]);
+                    const reel3 = Number(num2[i]);
+                    const multiplier = calculateSpinMultiplier(reel1, reel2, reel3);
+                    const spinPayout = parseFloat(betPerSpin) * multiplier;
+                    const reelResult = getReelResult(reel1, reel2, reel3);
+
+                    spins.push({
+                        spinIndex: i + 1,
+                        reel1,
+                        reel2,
+                        reel3,
+                        reelResult,
+                        multiplier,
+                        spinPayout: spinPayout.toFixed(6),
+                        betPerSpin
+                    });
+                }
+
+                return {
+                    gameId: gameId.toString(),
+                    player,
+                    token,
+                    tokenName,
+                    betPerSpin,
+                    totalBet: totalBet.toFixed(6),
+                    totalPayout,
+                    numSpins: numSpins,
+                    netResult: (parseFloat(totalPayout) - totalBet).toFixed(6),
+                    devFee,
+                    blockNumber,
+                    timestamp,
+                    transactionHash,
+                    spins
+                };
+            } catch (error) {
+                console.error(`Error extracting game ${gameId}:`, error);
+                throw error;
+            }
+        }
+
+        // Start extraction
+        async function startExtraction() {
+            try {
+                const rpcUrl = document.getElementById('rpc-url').value;
+                const slotsAddress = document.getElementById('slots-address').value;
+                const houseAddress = document.getElementById('house-address').value;
+                const startGameId = parseInt(document.getElementById('start-game-id').value);
+                const endGameId = parseInt(document.getElementById('end-game-id').value);
+                const maxGames = parseInt(document.getElementById('max-games').value);
+                const requestDelay = parseInt(document.getElementById('request-delay').value);
+
+                // Initialize provider and contracts (ethers v6)
+                provider = new ethers.JsonRpcProvider(rpcUrl);
+                slotsContract = new ethers.Contract(slotsAddress, SLOTS_ABI, provider);
+                houseContract = new ethers.Contract(houseAddress, HOUSE_ABI, provider);
+
+                // Get max game ID (ethers v6)
+                if (endGameId === 0) {
+                    updateStatus('Fetching current game count...', 'info');
+                    const nextId = await slotsContract.nextGameId();
+                    maxGameId = Number(nextId) - 1;
+                } else {
+                    maxGameId = endGameId;
+                }
+
+                currentGameId = startGameId - 1;
+                isPaused = false;
+
+                updateStatus(`Starting extraction from game ${startGameId} to ${maxGameId}...`, 'info');
+
+                let processed = 0;
+                const targetGames = maxGames > 0 ? Math.min(maxGames, maxGameId - startGameId + 1) : (maxGameId - startGameId + 1);
+
+                while (currentGameId < maxGameId && (maxGames === 0 || processed < maxGames)) {
+                    if (isPaused) {
+                        updateStatus('Extraction paused. Click Resume to continue.', 'info');
+                        saveCheckpoint();
+                        return;
+                    }
+
+                    currentGameId++;
+                    updateStatus(`Processing game ${currentGameId}/${maxGameId}...`, 'info');
+                    updateProgress(processed, targetGames);
+
+                    // Retry logic for failed games
+                    let retryCount = 0;
+                    const maxRetries = 10;
+                    let gameData = null;
+                    let lastError = null;
+                    let hasWaited = false; // Track if we've done the 10-second wait
+
+                    while (!gameData) {
+                        try {
+                            gameData = await extractGameData(currentGameId);
+                            if (gameData) {
+                                // Add each spin as a separate row
+                                gameData.spins.forEach((spin, index) => {
+                                extractedData.push({
+                                    gameId: gameData.gameId,
+                                    spinIndex: spin.spinIndex,
+                                    player: gameData.player,
+                                    token: gameData.token,
+                                    tokenName: gameData.tokenName,
+                                    betPerSpin: spin.betPerSpin,
+                                    totalBet: gameData.totalBet,
+                                    totalPayout: gameData.totalPayout,
+                                    numSpins: gameData.numSpins,
+                                    reel1: spin.reel1,
+                                    reel2: spin.reel2,
+                                    reel3: spin.reel3,
+                                    reelResult: spin.reelResult,
+                                    multiplier: spin.multiplier,
+                                    spinPayout: spin.spinPayout,
+                                    netResult: gameData.netResult,
+                                    devFee: gameData.devFee,
+                                    blockNumber: gameData.blockNumber,
+                                    timestamp: gameData.timestamp,
+                                    transactionHash: gameData.transactionHash
+                                });
+                                });
+                                processed++;
+                                updateResults();
+                                saveCheckpoint();
+                                break; // Success, exit retry loop
+                            }
+                        } catch (error) {
+                            lastError = error;
+                            retryCount++;
+                            
+                            if (retryCount < maxRetries) {
+                                // Regular retry with delay
+                                updateStatus(`Game ${currentGameId} failed (attempt ${retryCount}/${maxRetries}). Retrying...`, 'error');
+                                await new Promise(resolve => setTimeout(resolve, requestDelay));
+                            } else if (retryCount === maxRetries && !hasWaited) {
+                                // After max retries, wait 10 seconds before trying again
+                                updateStatus(`Game ${currentGameId} failed ${retryCount} times. Waiting 10 seconds before retry...`, 'error');
+                                await new Promise(resolve => setTimeout(resolve, 10000));
+                                hasWaited = true;
+                                // Don't increment retryCount here - allow one more attempt after wait
+                                retryCount--;
+                            } else {
+                                // Max retries exceeded (including after wait), skip this game
+                                console.error(`Error processing game ${currentGameId} after ${retryCount} attempts:`, lastError);
+                                updateStatus(`Game ${currentGameId} failed after ${retryCount} attempts. Skipping...`, 'error');
+                                // Don't increment processed, but continue to next game
+                                break; // Exit retry loop
+                            }
+                        }
+                    }
+
+                    // Delay between requests (only if we successfully processed or are moving to next game)
+                    if (currentGameId < maxGameId && (maxGames === 0 || processed < maxGames)) {
+                        await new Promise(resolve => setTimeout(resolve, requestDelay));
+                    }
+                }
+
+                updateStatus(`Extraction complete! Processed ${processed} games, extracted ${extractedData.length} spin rows.`, 'success');
+                updateProgress(targetGames, targetGames);
+                clearCheckpoint();
+            } catch (error) {
+                updateStatus(`Error: ${error.message}`, 'error');
+                console.error('Extraction error:', error);
+            }
+        }
+
+        // Pause extraction
+        function pauseExtraction() {
+            isPaused = true;
+            updateStatus('Pausing...', 'info');
+        }
+
+        // Resume extraction
+        function resumeExtraction() {
+            isPaused = false;
+            updateStatus('Resuming...', 'info');
+            startExtraction();
+        }
+
+        // Download CSV
+        function downloadCSV() {
+            if (extractedData.length === 0) {
+                alert('No data to download!');
+                return;
+            }
+
+            // CSV headers
+            const headers = [
+                'Game ID', 'Spin Index', 'Player', 'Token', 'Token Name',
+                'Bet Per Spin', 'Total Bet', 'Total Payout', 'Num Spins',
+                'Reel 1', 'Reel 2', 'Reel 3', 'Reel Results', 'Multiplier', 'Spin Payout',
+                'Net Result', 'Dev Fee',
+                'Block Number', 'Timestamp', 'Transaction Hash'
+            ];
+
+            // Convert data to CSV
+            const csvRows = [headers.join(',')];
+            extractedData.forEach(row => {
+                const values = [
+                    row.gameId, row.spinIndex, row.player, row.token, row.tokenName,
+                    row.betPerSpin, row.totalBet, row.totalPayout, row.numSpins,
+                    row.reel1, row.reel2, row.reel3, row.reelResult || '', row.multiplier, row.spinPayout,
+                    row.netResult, row.devFee,
+                    row.blockNumber, row.timestamp || '', row.transactionHash
+                ];
+                csvRows.push(values.map(v => `"${v}"`).join(','));
+            });
+
+            const csvContent = csvRows.join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `memespin-slots-data-${Date.now()}.csv`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+
+        // Clear results
+        function clearResults() {
+            if (confirm('Are you sure you want to clear all extracted data?')) {
+                extractedData = [];
+                clearCheckpoint();
+                updateResults();
+                updateStatus('Results cleared.', 'info');
+            }
+        }
+
+        // Initialize on load
+        window.addEventListener('load', () => {
+            loadCheckpoint();
+            if (checkpoint) {
+                updateStatus(`Checkpoint found. Last processed: Game ${checkpoint.lastGameId}. Click Resume to continue.`, 'info');
+            }
+        });
+    </script>
+</body>
+</html>
+
