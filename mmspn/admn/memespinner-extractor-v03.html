@@ -212,10 +212,6 @@ https://testnet-rpc.ten.xyz/v1/?token=8805E030F2253A88CA67A8B987999F268E1A9179</
                 <input type="text" id="slots-address" value="0x1AdD159DC347b94252d134655eA94e0d63Cc086e">
             </div>
             <div class="input-group">
-                <label>House Contract Address</label>
-                <input type="text" id="house-address" value="0x9CC5805A71571f3306b7357546566Ef4CbF78F1C">
-            </div>
-            <div class="input-group">
                 <label>Start Game ID</label>
                 <input type="number" id="start-game-id" value="1" min="1">
             </div>
@@ -264,12 +260,8 @@ https://testnet-rpc.ten.xyz/v1/?token=8805E030F2253A88CA67A8B987999F268E1A9179</
             "event GameEnded(address indexed player, uint256 indexed gameId, address token, uint256 bet, uint256 payout, uint8 numSpins, uint8[] num0, uint8[] num1, uint8[] num2)"
         ];
 
-        // House ABI (minimal)
-        const HOUSE_ABI = [
-            "function playerPools(address token) view returns (uint256)",
-            "function devFeesCollected(address token) view returns (uint256)",
-            "function feeBps(address token) view returns (uint256)"
-        ];
+        // House ABI - not needed anymore, but keeping for reference
+        // const HOUSE_ABI = [];
 
         let rpcUrls = [];
         let rpcIndex = 0;
@@ -279,7 +271,6 @@ https://testnet-rpc.ten.xyz/v1/?token=8805E030F2253A88CA67A8B987999F268E1A9179</
         let maxGameId = 0;
         let checkpoint = null;
         let slotsAddress = null;
-        let houseAddress = null;
 
         // Get next RPC URL in rotation
         function getNextRpcUrl() {
@@ -293,8 +284,7 @@ https://testnet-rpc.ten.xyz/v1/?token=8805E030F2253A88CA67A8B987999F268E1A9179</
         function createProviderAndContracts(rpcUrl) {
             const provider = new ethers.JsonRpcProvider(rpcUrl);
             const slotsContract = new ethers.Contract(slotsAddress, SLOTS_ABI, provider);
-            const houseContract = new ethers.Contract(houseAddress, HOUSE_ABI, provider);
-            return { provider, slotsContract, houseContract };
+            return { provider, slotsContract };
         }
 
         // Load checkpoint from localStorage
@@ -383,8 +373,6 @@ https://testnet-rpc.ten.xyz/v1/?token=8805E030F2253A88CA67A8B987999F268E1A9179</
             return `${getSymbolName(reel1)}.${getSymbolName(reel2)}.${getSymbolName(reel3)}`;
         }
 
-        // Cache for feeBps per token (to avoid repeated calls)
-        const feeBpsCache = {};
 
         // Calculate multiplier for a spin
         function calculateSpinMultiplier(reel1, reel2, reel3) {
@@ -430,7 +418,7 @@ https://testnet-rpc.ten.xyz/v1/?token=8805E030F2253A88CA67A8B987999F268E1A9179</
             return match ? match.payout : 0;
         }
 
-        // Extract game data - optimized to use GameEnded event (single call)
+        // Extract game data - ONLY uses getGame contract function (single call, no events)
         // Now uses rotating RPCs - each call gets a new provider/contracts
         async function extractGameData(gameId) {
             // Get next RPC URL and create fresh provider/contracts
@@ -439,65 +427,32 @@ https://testnet-rpc.ten.xyz/v1/?token=8805E030F2253A88CA67A8B987999F268E1A9179</
                 throw new Error('No RPC URLs configured');
             }
 
-            const { provider, slotsContract, houseContract } = createProviderAndContracts(rpcUrl);
+            const { provider, slotsContract } = createProviderAndContracts(rpcUrl);
 
             try {
-                // Get GameEnded event - this has all the data we need in one call
-                const filter = slotsContract.filters.GameEnded(null, gameId);
-                const events = await slotsContract.queryFilter(filter);
+                // Call getGame function - this is the ONLY call we make
+                const game = await slotsContract.getGame(gameId);
                 
-                if (events.length === 0) {
+                // Check if game exists and has ended
+                if (!game || !game.hasEnded) {
                     return null; // Game doesn't exist or hasn't ended
                 }
 
-                const event = events[0];
-                if (!event.args) {
-                    return null;
-                }
-
-                // Extract data from event
-                const player = event.args.player;
-                const token = event.args.token;
-                const bet = event.args.bet;
-                const payout = event.args.payout;
-                const numSpins = Number(event.args.numSpins);
-                const num0 = event.args.num0;
-                const num1 = event.args.num1;
-                const num2 = event.args.num2;
-                const blockNumber = event.blockNumber;
-                const transactionHash = event.transactionHash;
-
-                // Get block for timestamp (only call we need)
-                let timestamp = null;
-                try {
-                    const block = await provider.getBlock(blockNumber);
-                    timestamp = new Date(Number(block.timestamp) * 1000).toISOString();
-                } catch (e) {
-                    console.warn('Could not fetch block data:', e);
-                }
+                // Extract data from getGame response
+                const player = game.player;
+                const token = game.token;
+                const bet = game.betAmount;
+                const payout = game.payout;
+                const numSpins = Number(game.numSpins);
+                const num0 = game.num0;
+                const num1 = game.num1;
+                const num2 = game.num2;
 
                 // Format values
                 const betPerSpin = formatEther(bet);
                 const totalBet = parseFloat(betPerSpin) * numSpins;
                 const totalPayout = formatEther(payout);
                 const tokenName = getTokenName(token);
-
-                // Get feeBps (cache it per token to avoid repeated calls)
-                let feeBps = feeBpsCache[token];
-                if (feeBps === undefined) {
-                    try {
-                        feeBps = await houseContract.feeBps(token);
-                        feeBpsCache[token] = feeBps;
-                    } catch (e) {
-                        console.warn('Could not fetch feeBps:', e);
-                        feeBps = 0;
-                    }
-                }
-
-                // Calculate dev fee as percentage of total bet
-                const devFeeBps = Number(feeBps);
-                const devFeeAmount = (totalBet * devFeeBps) / 10000;
-                const devFee = devFeeAmount.toFixed(6);
 
                 // Process each spin
                 const spins = [];
@@ -531,10 +486,6 @@ https://testnet-rpc.ten.xyz/v1/?token=8805E030F2253A88CA67A8B987999F268E1A9179</
                     totalPayout,
                     numSpins: numSpins,
                     netResult: (parseFloat(totalPayout) - totalBet).toFixed(6),
-                    devFee,
-                    blockNumber,
-                    timestamp,
-                    transactionHash,
                     spins
                 };
             } catch (error) {
@@ -558,7 +509,6 @@ https://testnet-rpc.ten.xyz/v1/?token=8805E030F2253A88CA67A8B987999F268E1A9179</
                 }
 
                 slotsAddress = document.getElementById('slots-address').value;
-                houseAddress = document.getElementById('house-address').value;
                 const startGameId = parseInt(document.getElementById('start-game-id').value);
                 const endGameId = parseInt(document.getElementById('end-game-id').value);
                 const maxGames = parseInt(document.getElementById('max-games').value);
@@ -569,7 +519,7 @@ https://testnet-rpc.ten.xyz/v1/?token=8805E030F2253A88CA67A8B987999F268E1A9179</
 
                 // Initialize with first RPC to get max game ID
                 const initialRpc = rpcUrls[0];
-                const { provider, slotsContract } = createProviderAndContracts(initialRpc);
+                const { slotsContract } = createProviderAndContracts(initialRpc);
 
                 // Get max game ID (ethers v6)
                 if (endGameId === 0) {
@@ -628,11 +578,7 @@ https://testnet-rpc.ten.xyz/v1/?token=8805E030F2253A88CA67A8B987999F268E1A9179</
                                     reelResult: spin.reelResult,
                                     multiplier: spin.multiplier,
                                     spinPayout: spin.spinPayout,
-                                    netResult: gameData.netResult,
-                                    devFee: gameData.devFee,
-                                    blockNumber: gameData.blockNumber,
-                                    timestamp: gameData.timestamp,
-                                    transactionHash: gameData.transactionHash
+                                    netResult: gameData.netResult
                                 });
                                 });
                                 processed++;
@@ -705,8 +651,7 @@ https://testnet-rpc.ten.xyz/v1/?token=8805E030F2253A88CA67A8B987999F268E1A9179</
                 'Game ID', 'Spin Index', 'Player', 'Token', 'Token Name',
                 'Bet Per Spin', 'Total Bet', 'Total Payout', 'Num Spins',
                 'Reel 1', 'Reel 2', 'Reel 3', 'Reel Results', 'Multiplier', 'Spin Payout',
-                'Net Result', 'Dev Fee',
-                'Block Number', 'Timestamp', 'Transaction Hash'
+                'Net Result'
             ];
 
             // Convert data to CSV
@@ -716,8 +661,7 @@ https://testnet-rpc.ten.xyz/v1/?token=8805E030F2253A88CA67A8B987999F268E1A9179</
                     row.gameId, row.spinIndex, row.player, row.token, row.tokenName,
                     row.betPerSpin, row.totalBet, row.totalPayout, row.numSpins,
                     row.reel1, row.reel2, row.reel3, row.reelResult || '', row.multiplier, row.spinPayout,
-                    row.netResult, row.devFee,
-                    row.blockNumber, row.timestamp || '', row.transactionHash
+                    row.netResult
                 ];
                 csvRows.push(values.map(v => `"${v}"`).join(','));
             });
